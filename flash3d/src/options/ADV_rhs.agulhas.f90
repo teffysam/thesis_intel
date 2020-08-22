@@ -72,6 +72,7 @@
 !---------- calculate the advection at (x,y) (velocity increasing)
 
 	  IF (0.8 < r_field(1) .AND. 1 >= r_field(1) ) THEN
+		!TODO #1 Check range
 		  write(*,*) r_field
 	    r_rhs = 2.0 !time_dependent_rhs(p_param,r_tim,r_radius,r_high)
 	  ELSE
