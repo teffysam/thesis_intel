@@ -1,5 +1,7 @@
 {
     "git.ignoreLimitWarning": true,
     "editor.fontFamily": " 'BitstreamVeraSansMono Nerd Font Mono'",
-    "vim.easymotionMarkerFontFamily": "MesloLGS Nerd Font Mono"
+    "C_Cpp.default.customConfigurationVariables": {},
+    "debug.console.fontFamily": "'BitStreamVeraSansMono Nerd Font Mono'",
+    "terminal.integrated.fontFamily": "'BitStreamVeraSansMono Nerd Font Mono'"
 }
