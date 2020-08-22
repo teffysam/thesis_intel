@@ -1,0 +1,546 @@
+!*****************************************************************
+!
+! MODULE NAME:
+!	ADV_wind
+! FUNCTION:
+!	calculate the windfield for the advection problem
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_windfield
+! FUNCTION:
+!	calculate the advecting force for simple advection
+! SYNTAX:
+!	real.arr= slm_windfield(real.arr, real)
+! ON INPUT:
+!	r_coord: coordinates of point		real
+!	r_time:  time coordinate (optional)	real
+! ON OUTPUT:
+!	r_field: windfield			real
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! PUBLIC:
+!
+! COMMENTS:
+!
+! USES:
+!	MISC_globalparam, MISC_error
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	12/97
+!	2. bug fix concerning interp.	j. behrens	2/98
+!	3. compliant to amatos 1.0	j. behrens	12/2000
+!	4. simple data reading and interpolation(similar to 2D-Case)    e.gerwing   03/2015
+!
+!*****************************************************************
+	MODULE ADV_wind
+		  USE GRID_api
+	  USE FLASH_parameters
+	  PRIVATE
+	  INTEGER, PARAMETER    :: i_ioerr=0
+	  REAL :: r_intervallen, r_scalfacx, r_scalfacy, &
+	                           r_readlast, r_scalinvx, r_scalinvy
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowx
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowy
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowz
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lat
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lon
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_z
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_time
+      INTEGER                            :: i_lon, i_lat, i_z, i_timesteps
+	  INTEGER                            :: i_timeinterval
+	  
+	  PUBLIC                    :: slm_windfield, slm_windinit, slm_windquit
+	  
+	  CONTAINS
+!*****************************************************************
+	  FUNCTION slm_windfield(r_coord, r_time) RESULT (r_field)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  REAL, DIMENSION(GRID_dimension), INTENT(in) :: r_coord
+	  REAL, INTENT(in), OPTIONAL :: r_time
+	  REAL, DIMENSION(GRID_dimension)             :: r_field
+	  REAL                       :: r_tim
+	  CHARACTER (LEN=67)                          :: c_xfile, c_yfile
+	  CHARACTER (LEN=35)                          :: c_tmp
+	  CHARACTER (LEN=3)                           :: c_num
+	  INTEGER                                     :: i_iost, i_cnt, j_cnt
+
+!---------- set time
+
+	  IF(present(r_time)) THEN
+	    r_tim= r_time
+	  ELSE
+	    r_tim= 0.0
+	  END IF
+	  
+
+!---------- decide, if data has to be read
+
+	  data_read: IF(r_readlast <= r_tim) THEN
+
+!---------- update values for next open
+
+	    r_readlast    = r_readlast+ r_intervallen
+	    i_timeinterval= i_timeinterval+ 1
+	  END IF data_read
+
+!---------- interpolate to coordinate
+
+	  r_field= data_interpol(r_coord,i_timeinterval)
+
+	  RETURN
+ 1000	  FORMAT(i3.3)
+	  END FUNCTION slm_windfield
+
+!*****************************************************************
+	  SUBROUTINE read_netcdf_currents(c_filename)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+      INCLUDE "netcdf.inc"
+      
+!---------- input parameters      
+	  CHARACTER (LEN=io_fillen), INTENT(in)  :: c_filename
+	  
+!---------- local variables
+	  INTEGER         :: i_alct, i_ncstat
+      INTEGER         :: i_fileid
+      INTEGER         :: i_dimid, i_varid
+      INTEGER         :: i_tm, i_ln, i_lt, i_lz
+
+!---------- open current file
+
+      i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
+!---------- determine lon/lat/height/time dimension sizes (grid size of currents field)
+
+      i_ncstat= nf_inq_dimid(i_fileid, 'rlon', i_dimid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lon dimension')
+      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lon)
+	  write(*,*) i_lon
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon dimension')
+      
+      i_ncstat= nf_inq_dimid(i_fileid, 'rlat', i_dimid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lat dimension')
+      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lat)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat dimension')
+	    
+	    i_ncstat= nf_inq_dimid(i_fileid, 'height', i_dimid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify z dimension')
+      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_z)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read z dimension')
+
+      i_ncstat= nf_inq_dimid(i_fileid, 'time', i_dimid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify time dimension')
+      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_timesteps)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time dimension')
+    
+!---------- allocate lat/long/height/time coordinate arrays
+
+	  ALLOCATE(r_lat(i_lat), r_lon(i_lon), r_z(i_z), r_time(i_timesteps), stat= i_alct)
+      IF(i_alct /= 0) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate lat/lon/z/time field')
+
+!---------- read lat/long/height/time coordinate values
+
+      i_ncstat= nf_inq_varid(i_fileid, 'rlon', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
+      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_lon)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'rlat', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
+      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_lat)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
+
+	  i_ncstat= nf_inq_varid(i_fileid, 'height', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
+      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_z)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
+
+	    i_ncstat= nf_inq_varid(i_fileid, 'time', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine time varid')
+      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_time)
+	  write(*,*) r_time
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time data')
+
+!---------- allocate current data arrays
+
+	  ALLOCATE( r_flowx(i_lon, i_lat, i_z, i_timesteps), r_flowy(i_lon, i_lat, i_z, i_timesteps),&
+	    & r_flowz(i_lon, i_lat, i_z, i_timesteps), stat= i_alct)
+      IF(i_alct /= 0) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate currents fields')
+
+!---------- read x-/y-/z-direction data of currents
+
+      i_ncstat= nf_inq_varid(i_fileid, 'var131', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
+      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowx)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var131 data')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'var132', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var132')
+      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowy)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var132 data')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'var135', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var135')
+      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowz)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var135 data')
+
+!---------- Fix mask values
+
+	  DO i_tm=1,i_timesteps
+	  	DO i_lt= 1,i_lat
+	  	  DO i_ln= 1,i_lon
+	  	    DO i_lz= 1,i_z
+	  	      IF(r_flowx(i_ln,i_lt,i_lz,i_tm) <= -8.99E+33) r_flowx(i_ln,i_lt,i_lz,i_tm)= 0.
+	  	      IF(r_flowy(i_ln,i_lt,i_lz,i_tm) <= -8.99E+33) r_flowy(i_ln,i_lt,i_lz,i_tm)= 0.
+	  	      IF(r_flowz(i_ln,i_lt,i_lz,i_tm) <= -8.99E+33) r_flowz(i_ln,i_lt,i_lz,i_tm)= 0.
+	  	    END DO
+	  	  END DO
+	  	END DO
+	  END DO
+
+!-----------set timeinterval length between winddata (Timeformat here: yymmdd,ddd)
+
+	  r_intervallen= (r_time(2) - r_time(1))*24*60*60
+
+!---------- close currents file
+
+	  i_ncstat= nf_close(i_fileid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
+
+	  END SUBROUTINE read_netcdf_currents
+
+!*****************************************************************
+	  SUBROUTINE time_interpol(p_control)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (control_struct)                                :: p_control
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_fx, r_fy, r_fz
+	  REAL                                :: r_t, r_dt
+	  INTEGER                             :: i_tstart, i_tend, i_tint, i_tstep, i_alct
+
+!---------- initialize
+
+	  r_dt = p_control%phy%r_deltatime
+	  i_tstart = p_control%phy%i_frsttimestep
+	  i_tend = p_control%phy%i_lasttimestep
+
+!---------- allocate interpolated windfiels
+
+	  ALLOCATE(r_fx(i_lon,i_lat,i_z,i_tend-i_tstart+1),r_fy(i_lon,i_lat,i_z,i_tend-i_tstart+1),&
+	    &r_fz(i_lon,i_lat,i_z,i_tend-i_tstart+1), stat= i_alct)
+      IF(i_alct /= 0) &
+	    CALL grid_error(c_error='[time_interpol]: could not allocate windfields r_fx, r_fy, r_fz')
+
+!---------- initialize 
+
+	  i_tint = i_timeinterval+1
+	  r_t = 0.0
+
+!---------- Linear Interpolation for every timestep (only valid for equidistant timeintervals in Winddata)
+
+	  DO i_tstep = i_tstart,i_tend
+	    IF (r_t > r_intervallen) THEN      ! Use Winddata from next timestep
+	        r_t = 0
+	        i_tint = i_tint +1
+	        IF (i_tint == i_timesteps) THEN  ! Reached last Winddata
+	            i_tint = i_timesteps -1
+	            r_t = r_intervallen
+	        END IF
+	    END IF
+	  
+	    r_fx(:,:,:,i_tstep) = ( r_flowx(:,:,:,i_tint)*(r_intervallen-r_t) + r_flowx(:,:,:,i_tint+1)*(r_t-0) )/r_intervallen
+	    r_fy(:,:,:,i_tstep) = ( r_flowy(:,:,:,i_tint)*(r_intervallen-r_t) + r_flowy(:,:,:,i_tint+1)*(r_t-0) )/r_intervallen
+	    r_fz(:,:,:,i_tstep) = ( r_flowz(:,:,:,i_tint)*(r_intervallen-r_t) + r_flowz(:,:,:,i_tint+1)*(r_t-0) )/r_intervallen
+	  
+	    r_t = r_t + r_dt
+	  END DO
+
+!---------- Reallocate Windfields with new shape
+
+	  DEALLOCATE(r_flowx, r_flowy, r_flowz)
+	  ALLOCATE(r_flowx(i_lon,i_lat,i_z,i_tend-i_tstart+1),r_flowy(i_lon,i_lat,i_z,i_tend-i_tstart+1),&
+	    &r_flowz(i_lon,i_lat,i_z,i_tend-i_tstart+1) ,stat= i_alct)
+      IF(i_alct /= 0) &
+	    CALL grid_error(c_error='[time_interpol]: could not allocate windfields r_flowx, r_flowy, r_flowz')
+
+!---------- Use interpolated windfields and deallocate temporary Windfiels r_fx,r_fy
+
+	  r_flowx = r_fx
+	  r_flowy = r_fy
+	  r_flowz = r_fz
+	  DEALLOCATE(r_fx, r_fy, r_fz)
+
+!----------- new timeinterval between interpolated Windfields
+	  r_intervallen= r_dt
+
+	  END SUBROUTINE time_interpol
+
+!*****************************************************************
+	  SUBROUTINE slm_windinit(p_control)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (control_struct)     :: p_control
+	  CHARACTER (len=io_fillen) :: c_name
+
+!---------- initialize
+
+	  c_name= p_control%io%c_windfile
+
+!---------- read current data from NetCDF file
+
+	  CALL read_netcdf_currents(c_name)
+
+!---------- initialize some values
+
+	  r_readlast= 0.0
+	  i_timeinterval= 0
+!	  r_intervallen= 3600.
+
+!---------- Interpolate between timesteps
+
+	  CALL time_interpol(p_control)
+
+	  RETURN
+ 2000	  FORMAT(a80)
+ 2010	  FORMAT(a32)
+	  END SUBROUTINE slm_windinit
+
+!*****************************************************************
+	  SUBROUTINE slm_windquit
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  
+!---------- deallocate wind data arrays
+
+	  DEALLOCATE(r_flowx, r_flowy, r_flowz)
+	  DEALLOCATE(r_lon, r_lat, r_z)
+
+	  RETURN
+	  END SUBROUTINE slm_windquit
+
+!*****************************************************************
+	  FUNCTION data_interpol(r_coord,i_time) RESULT (r_inter)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL, DIMENSION(GRID_dimension) :: r_coord
+	  INTEGER         :: i_time
+	  REAL, DIMENSION(GRID_dimension) :: r_inter
+	  INTEGER                         :: i_lox, i_hix, i_loy, i_hiy, &
+	    i_loz, i_hiz, i_cnt
+	  REAL                            :: r_dx, r_dy, r_dz, r_dxi, r_dyi, r_dzi, r_lx, r_hx, &
+	    r_ly, r_hy, r_lz, r_hz
+	  REAL                            :: r_xu1, r_xu2, r_xu3, r_xu4, &
+	    r_xv1, r_xv2, r_xv3, r_xv4, r_xw1, r_xw2, r_xw3, r_xw4, &
+	    r_yu1, r_yu2, r_yv1, r_yv2, r_yw1, r_yw2
+	  REAL                            :: r_scalx, r_scaly, r_scalz
+	  REAL                            :: r_deg
+	  REAL, PARAMETER                 :: r_earth=40075000. ! earth circumference
+	  REAL, PARAMETER                 :: PI=3.1415927
+ 	
+!---------- initialize radians
+
+	  r_deg= 360./r_earth
+
+!---------- find wind box corresponding to coordinate
+
+	  i_lox=1
+	  i_hix=2
+	  i_loy=1
+	  i_hiy=2
+	  i_loz=1
+	  i_hiz=2
+
+	  determine_lon: DO i_cnt=1, i_lon-1
+	    IF(r_lon(i_cnt) <= r_coord(1) .AND. r_lon(i_cnt +1) >= r_coord(1)) THEN
+	        i_lox= i_cnt
+	        i_hix= i_cnt+1
+	        exit determine_lon
+	    END IF
+	  END DO determine_lon
+	  IF(r_lon(i_lon) <= r_coord(1)) THEN
+	    i_lox = i_lon-1
+	    i_hix = i_lon
+	  END IF
+
+	  determine_lat: DO i_cnt=1, i_lat-1
+	    IF(r_lat(i_cnt) <= r_coord(2) .AND. r_lat(i_cnt +1) >= r_coord(2)) THEN
+	        i_loy= i_cnt
+	        i_hiy= i_cnt+1
+	        exit determine_lat
+	    END IF
+	  END DO determine_lat
+	  IF(r_lat(i_lat) <= r_coord(2)) THEN
+	    i_loy = i_lat-1
+	    i_hiy = i_lat
+	  END IF
+
+	  determine_height: DO i_cnt=1, i_z-1
+	    IF(r_z(i_cnt) <= r_coord(3) .AND. r_z(i_cnt +1) >= r_coord(3)) THEN
+	        i_loz= i_cnt
+	        i_hiz= i_cnt+1
+	        exit determine_height
+	    END IF
+	  END DO determine_height
+	  IF(r_z(i_z) <= r_coord(3)) THEN
+	    i_loz = i_z-1
+	    i_hiz = i_z
+	  END IF
+
+!---------- calculate weights for bilinear interpolation
+
+	  r_dx= r_lon(i_hix)- r_lon(i_lox)
+	  r_dy= r_lat(i_hiy)- r_lat(i_loy)
+	  r_dz= r_z(i_hiz)- r_z(i_loz)
+
+	  r_lx= r_coord(1) - r_lon(i_lox)
+	  r_ly= r_coord(2) - r_lat(i_loy)
+	  r_lz= r_coord(3) - r_z(i_loz)
+
+	  r_hx= r_lon(i_hix) - r_coord(1)
+	  r_hy= r_lat(i_hiy) - r_coord(2)
+	  r_hz= r_z(i_hiz) - r_coord(3)
+
+	  r_scalx= r_deg * 1./cos(r_coord(2)*PI/180.)  ! in degree/sec
+	  r_scaly= r_deg
+	  r_scalz = 1./1000.                           ! m to km
+
+!---------- linear interpolation in x-direction
+
+	  IF(r_dx /= 0.0) THEN
+	    r_dxi= 1./r_dx
+	    r_xu1= (r_hx* r_flowx(i_lox, i_loy, i_loz, i_time)+ &
+	            r_lx* r_flowx(i_hix, i_loy, i_loz, i_time))* r_dxi
+	    r_xu2= (r_hx* r_flowx(i_lox, i_hiy, i_loz, i_time)+ &
+	            r_lx* r_flowx(i_hix, i_hiy, i_loz, i_time))* r_dxi
+	    r_xu3= (r_hx* r_flowx(i_lox, i_loy, i_hiz, i_time)+ &
+	            r_lx* r_flowx(i_hix, i_loy, i_hiz, i_time))* r_dxi
+	    r_xu4= (r_hx* r_flowx(i_lox, i_hiy, i_hiz, i_time)+ &
+	            r_lx* r_flowx(i_hix, i_hiy, i_hiz, i_time))* r_dxi
+
+	    r_xv1= (r_hx* r_flowy(i_lox, i_loy, i_loz, i_time)+ &
+	            r_lx* r_flowy(i_hix, i_loy, i_loz, i_time))* r_dxi
+	    r_xv2= (r_hx* r_flowy(i_lox, i_hiy, i_loz, i_time)+ &
+	            r_lx* r_flowy(i_hix, i_hiy, i_loz, i_time))* r_dxi
+	    r_xv3= (r_hx* r_flowy(i_lox, i_loy, i_hiz, i_time)+ &
+	            r_lx* r_flowy(i_hix, i_loy, i_hiz, i_time))* r_dxi
+	    r_xv4= (r_hx* r_flowy(i_lox, i_hiy, i_hiz, i_time)+ &
+	            r_lx* r_flowy(i_hix, i_hiy, i_hiz, i_time))* r_dxi
+
+	    r_xw1= (r_hx* r_flowz(i_lox, i_loy, i_loz, i_time)+ &
+	            r_lx* r_flowz(i_hix, i_loy, i_loz, i_time))* r_dxi
+	    r_xw2= (r_hx* r_flowz(i_lox, i_hiy, i_loz, i_time)+ &
+	            r_lx* r_flowz(i_hix, i_hiy, i_loz, i_time))* r_dxi
+	    r_xw3= (r_hx* r_flowz(i_lox, i_loy, i_hiz, i_time)+ &
+	            r_lx* r_flowz(i_hix, i_loy, i_hiz, i_time))* r_dxi
+	    r_xw4= (r_hx* r_flowz(i_lox, i_hiy, i_hiz, i_time)+ &
+	            r_lx* r_flowz(i_hix, i_hiy, i_hiz, i_time))* r_dxi
+	  ELSE
+	    r_xu1= r_flowx(i_lox, i_loy, i_loz, i_time)
+	    r_xu2= r_flowx(i_lox, i_hiy, i_loz, i_time)
+	    r_xu3= r_flowx(i_lox, i_loy, i_hiz, i_time)
+	    r_xu4= r_flowx(i_lox, i_hiy, i_hiz, i_time)
+
+	    r_xv1= r_flowy(i_lox, i_loy, i_loz, i_time)
+	    r_xv2= r_flowy(i_lox, i_hiy, i_loz, i_time)
+	    r_xv3= r_flowy(i_lox, i_loy, i_hiz, i_time)
+	    r_xv4= r_flowy(i_lox, i_hiy, i_hiz, i_time)
+
+	    r_xw1= r_flowz(i_lox, i_loy, i_loz, i_time)
+	    r_xw2= r_flowz(i_lox, i_hiy, i_loz, i_time)
+	    r_xw3= r_flowz(i_lox, i_loy, i_hiz, i_time)
+	    r_xw4= r_flowz(i_lox, i_hiy, i_hiz, i_time)
+	  END IF
+
+!---------- linear interpolation in y-direction
+
+	  IF(r_dy /= 0.0) THEN
+	    r_dyi= 1./r_dy
+	    r_yu1= (r_hy* r_xu1+ r_ly* r_xu2)* r_dyi
+	    r_yu2= (r_hy* r_xu3+ r_ly* r_xu4)* r_dyi
+
+	    r_yv1= (r_hy* r_xv1+ r_ly* r_xv2)* r_dyi
+	    r_yv2= (r_hy* r_xv3+ r_ly* r_xv4)* r_dyi
+
+	    r_yw1= (r_hy* r_xw1+ r_ly* r_xw2)* r_dyi
+	    r_yw2= (r_hy* r_xw3+ r_ly* r_xw4)* r_dyi
+	  ELSE
+	    r_yu1= r_xu1
+	    r_yu2= r_xu3
+
+	    r_yv1= r_xv1
+	    r_yv2= r_xv3
+
+	    r_yw1= r_xw1
+	    r_yw2= r_xw3
+	  END IF
+
+!---------- linear interpolation in z-direction
+
+	  IF(r_dz /= 0.0) THEN
+	    r_dzi= 1./r_dz
+	    r_inter(1)= (r_hz* r_yu1+ r_lz* r_yu2)* r_dzi * r_scalx
+	    r_inter(2)= (r_hz* r_yv1+ r_lz* r_yv2)* r_dzi * r_scaly
+	    r_inter(3)= (r_hz* r_yw1+ r_lz* r_yw2)* r_dzi * r_scalz
+	  ELSE
+	    r_inter(1)= r_yu1* r_scalx
+	    r_inter(2)= r_yv1 * r_scaly
+	    r_inter(3)= r_yw1 * r_scalz
+	  END IF
+	  
+
+	  RETURN
+	  END FUNCTION data_interpol
+
+!*****************************************************************
+	END MODULE ADV_wind

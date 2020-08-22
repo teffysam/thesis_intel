@@ -1,0 +1,337 @@
+!*****************************************************************
+!
+! MODULE NAME:
+!	FEM_inittriang
+! FUNCTION:
+!	initialize a simple triangulation
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	grid_create
+! FUNCTION:
+!	create a macro triangulation
+! SYNTAX:
+!	call grid_create(grid,char)
+! ON INPUT:
+!	c_name:  input file name (optional)	CHARACTER
+! ON OUTPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! PUBLIC:
+!	grid_create
+! COMMENTS:
+!
+! USES:
+!	FEM_define, FEM_handle, FEM_gridgen
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	8/96
+!	2. added edges			j. behrens	10/96
+!	3. now with handles and time	j. behrens	10/96
+!	4. FEM_handle added		j. behrens	7/97
+!	5. hash table version		j. behrens	7/97
+!	6. fem_create used		j. behrens	10/97
+!	7. now reading from file	j. behrens	12/97
+!	8. 3D version			j. behrens	2/2000
+!
+!*****************************************************************
+	MODULE FEM_inittriang
+	  USE MISC_globalparam
+	  USE MISC_error
+	  USE FEM_define
+	  USE FEM_handle
+	  USE FEM_create
+	  PRIVATE
+	  PUBLIC :: grid_create
+	  CONTAINS
+!*****************************************************************
+	  SUBROUTINE grid_create(p_ghand, c_name)
+
+! ERROR CODE: 20
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle)                   :: p_ghand
+	  CHARACTER (LEN=GRID_parameters%i_stringlength), OPTIONAL  :: c_name
+	  CHARACTER (LEN=GRID_parameters%i_stringlength)            :: c_nam
+	  TYPE (node), POINTER                 :: p_ntmp
+	  TYPE (edge), POINTER                 :: p_gtmp
+	  TYPE (elmt), POINTER                 :: p_etmp
+	  TYPE (tetra), POINTER                :: p_ttmp
+	  INTEGER (KIND = GRID_SI)                              :: i_tim, i_cnt, i_count, &
+	    i_iofil, i_iost, i_ioend, i_alct, i_tmp
+	  REAL (KIND = GRID_SR), DIMENSION(:,:), ALLOCATABLE    :: r_coo
+	  INTEGER (KIND = GRID_SI), DIMENSION(:,:), ALLOCATABLE :: i_gnd, i_gel, i_end, i_eed, &
+	    i_tnd, i_ted, i_tel
+	  INTEGER (KIND = GRID_SI), DIMENSION(:), ALLOCATABLE   :: i_gbn, i_eme, i_ebn, i_gne
+	  CHARACTER (len=80)                   :: c_filrow
+	  INTEGER (KIND = GRID_SI)                              :: i_griddim, i_elvert, &
+	    i_nnodes, i_nedges, i_nelems, i_ntetrs, i_neumboun, i_innerboun, i_diriboun, &
+	    i_nodeno, i_edgeno, i_elmtno, i_tetrno
+
+!---------- initialize grid handes
+
+	  p_grid(:)%i_ttotal= 0
+	  p_grid(:)%i_etotal= 0
+	  p_grid(:)%i_gtotal= 0
+	  p_grid(:)%i_ntotal= 0
+	  p_ghand%i_enumboun= 0	  
+	  p_ghand%i_gnumboun= 0	  
+
+!---------- manipulate global time tag temporarily
+
+	  i_tim        = i_futuretime
+	  i_futuretime = p_ghand%i_timetag
+
+!---------- allocate hashing tables
+
+	  CALL grid_initdatastruct
+
+!---------- initialize file name
+
+	  file_present: IF(present(c_name)) THEN
+	    c_nam= c_name
+	  ELSE file_present
+	    c_nam= 'Triang.dat'
+	  END IF file_present
+
+!---------- open file
+
+	  i_iofil= 16
+	  open(unit= i_iofil, file= c_nam, status= 'OLD', action= 'READ', iostat= i_iost)
+	  file_notopen: IF(i_iost /= 0) THEN
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) 'ERROR: Filename: ', c_nam
+	    CALL print_error(200)
+	  END IF file_notopen
+	  IF(GRID_parameters%iolog > 0) &
+	    write(GRID_parameters%iolog,*) 'INFO: Opened file [', c_nam,'] on unit: ', i_iofil
+
+!---------- loop to read all the lines of file
+
+	  read_loop: DO
+	    read(i_iofil,2000,iostat=i_ioend) c_filrow
+
+!---------- if file ended
+
+	    file_end: IF(i_ioend /= 0) THEN
+	      close(i_iofil)
+	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'INFO: Closed file on unit: ', i_iofil
+	      EXIT read_loop
+	    ELSE file_end
+
+!---------- decide what to DO with line according to first character
+
+	    comment_line: IF(c_filrow(1:1) == '#' .or. c_filrow(1:1) == '!') THEN
+	      CYCLE read_loop
+	    ELSE IF(c_filrow(1:12) == 'GRID_DIMENSI') THEN comment_line
+	      read(i_iofil,*) i_griddim
+	      check_dim: IF(i_griddim /= DEF_dimension) THEN
+	        CALL print_error(201)
+	      END IF check_dim
+	    ELSE IF(c_filrow(1:12) == 'ELEMENT_VERT') THEN comment_line
+	      read(i_iofil,*) i_elvert
+	      check_vert: IF(i_elvert /= DEF_elnodes) THEN
+	        CALL print_error(201)
+	      END IF check_vert
+	    ELSE IF(c_filrow(1:12) == 'NUMBER_OF_NO') THEN comment_line
+	      read(i_iofil,*) i_nnodes
+	      ALLOCATE(r_coo(DEF_dimension,i_nnodes), stat=i_alct)
+	      IF(i_alct /= 0) THEN
+	        CALL print_error(202)
+	      END IF
+	    ELSE IF(c_filrow(1:12) == 'NUMBER_OF_ED') THEN comment_line
+	      read(i_iofil,*) i_nedges
+	      ALLOCATE(i_gnd(DEF_egnodes,i_nedges), i_gel(DEF_egelems,i_nedges), &
+	               i_gbn(i_nedges), i_gne(i_nedges), stat=i_alct)
+	      IF(i_alct /= 0) THEN
+	        CALL print_error(202)
+	      END IF
+	    ELSE IF(c_filrow(1:12) == 'NUMBER_OF_EL') THEN comment_line
+	      read(i_iofil,*) i_nelems
+	      ALLOCATE(i_end(DEF_elnodes,i_nelems), i_eed(DEF_eledges,i_nelems), &
+	               i_eme(i_nelems), i_ebn(i_nelems), stat=i_alct)
+	      IF(i_alct /= 0) THEN
+	        CALL print_error(202)
+	      END IF
+	    ELSE IF(c_filrow(1:12) == 'NUMBER_OF_TE') THEN comment_line
+	      read(i_iofil,*) i_ntetrs
+	      ALLOCATE(i_tnd(DEF_tetnodes,i_ntetrs), i_ted(DEF_tetedges,i_ntetrs), &
+	               i_tel(DEF_tetelmts,i_ntetrs), stat=i_alct)
+	      IF(i_alct /= 0) THEN
+	        CALL print_error(202)
+	      END IF
+	    ELSE IF(c_filrow(1:12) == 'DEF_INNERITE') THEN comment_line
+	      read(i_iofil,*) i_innerboun
+	    ELSE IF(c_filrow(1:12) == 'DEF_NEUMANNB') THEN comment_line
+	      read(i_iofil,*) i_neumboun
+	    ELSE IF(c_filrow(1:12) == 'DEF_DIRICHLE') THEN comment_line
+	      read(i_iofil,*) i_diriboun
+	    ELSE IF(c_filrow(1:12) == 'NODE_INDEXNU') THEN comment_line
+	      read(i_iofil,*) i_nodeno
+	      check_nn: IF(i_nodeno > i_nnodes) THEN
+	        CALL print_error(203)
+	      END IF check_nn
+	    ELSE IF(c_filrow(1:12) == 'EDGE_INDEXNU') THEN comment_line
+	      read(i_iofil,*) i_edgeno
+	      check_gn: IF(i_edgeno > i_nedges) THEN
+	        CALL print_error(204)
+	      END IF check_gn
+	    ELSE IF(c_filrow(1:12) == 'ELEMENT_INDE') THEN comment_line
+	      read(i_iofil,*) i_elmtno
+	      check_en: IF(i_elmtno > i_nelems) THEN
+	        CALL print_error(205)
+	      END IF check_en
+	    ELSE IF(c_filrow(1:12) == 'TETRA_INDEXN') THEN comment_line
+	      read(i_iofil,*) i_tetrno
+	      check_te: IF(i_tetrno > i_ntetrs) THEN
+	        CALL print_error(206)
+	      END IF check_te
+	    ELSE IF(c_filrow(1:12) == 'NODE_COORDIN') THEN comment_line
+	      read(i_iofil,*) (r_coo(i_cnt,i_nodeno), i_cnt=1,DEF_dimension)
+	    ELSE IF(c_filrow(1:12) == 'EDGE_NODEIND') THEN comment_line
+	      read(i_iofil,*) (i_gnd(i_cnt,i_edgeno), i_cnt=1,DEF_egnodes)
+	    ELSE IF(c_filrow(1:12) == 'EDGE_NUMELEM') THEN comment_line
+	      read(i_iofil,*) i_gne(i_edgeno)
+	    ELSE IF(c_filrow(1:12) == 'EDGE_ELEMENT') THEN comment_line
+	      read(i_iofil,*) (i_gel(i_cnt,i_edgeno), i_cnt=1,i_gne(i_edgeno))
+	    ELSE IF(c_filrow(1:12) == 'EDGE_BOUNDAR') THEN comment_line
+	      read(i_iofil,*) i_gbn(i_edgeno)
+	    ELSE IF(c_filrow(1:12) == 'ELEMENT_NODE') THEN comment_line
+	      read(i_iofil,*) (i_end(i_cnt,i_elmtno), i_cnt=1,DEF_elnodes)
+	    ELSE IF(c_filrow(1:12) == 'ELEMENT_EDGE') THEN comment_line
+	      read(i_iofil,*) (i_eed(i_cnt,i_elmtno), i_cnt=1,DEF_eledges)
+	    ELSE IF(c_filrow(1:12) == 'ELEMENT_MARK') THEN comment_line
+	      read(i_iofil,*) i_eme(i_elmtno)
+	    ELSE IF(c_filrow(1:12) == 'ELEMENT_BOUN') THEN comment_line
+	      read(i_iofil,*) i_ebn(i_elmtno)
+	    ELSE IF(c_filrow(1:12) == 'TETRA_NODEIN') THEN comment_line
+	      read(i_iofil,*) (i_tnd(i_cnt,i_tetrno), i_cnt=1,DEF_tetnodes)
+	    ELSE IF(c_filrow(1:12) == 'TETRA_EDGEIN') THEN comment_line
+	      read(i_iofil,*) (i_ted(i_cnt,i_tetrno), i_cnt=1,DEF_tetedges)
+	    ELSE IF(c_filrow(1:12) == 'TETRA_ELEMEN') THEN comment_line
+	      read(i_iofil,*) (i_tel(i_cnt,i_tetrno), i_cnt=1,DEF_tetelmts)
+	    END IF comment_line
+
+	    END IF file_end
+	  END DO read_loop
+	    
+!---------- create nodes
+
+	  node_create: DO i_count=1,i_nnodes
+	    p_ntmp             => create_node(r_coo(:,i_count))
+	    p_nhash(i_count)%np=> p_ntmp
+	    i_ngrid(i_count,i_futuretime)= i_count
+	  END DO node_create
+
+!---------- ok, nodes created, yeah! updating handles
+
+	  p_ghand%i_ntotal  = i_nnodes
+	  p_ghand%i_nnumber = p_ghand%i_ntotal
+
+!---------- create edges
+
+	  edge_create: DO i_count=1,i_nedges
+	    boundary: IF(i_gbn(i_count) == i_innerboun) THEN
+	      i_tmp= DEF_inner
+	    ELSE IF(i_gbn(i_count) == i_diriboun) THEN boundary
+	      i_tmp= DEF_dirichlet
+	    ELSE IF(i_gbn(i_count) == i_neumboun) THEN boundary
+	      i_tmp= DEF_neumann
+	    ELSE boundary
+	      i_tmp= i_gbn(i_count)
+	    END IF boundary
+	    p_gtmp => create_edge(i_gnd(:,i_count), p_elements= i_gel(:,i_count), &
+	                          i_numelements= i_gne(i_count), i_boundary= i_tmp, &
+	                          i_stat=DEF_unrefined)
+	    p_ghash(i_count)%gp   => p_gtmp
+	    i_ggrid(i_count,i_futuretime)=  i_count
+	    i_gfine(i_count,i_futuretime)=  i_count
+	  END DO edge_create
+
+!---------- update handle
+
+	  p_ghand%i_gtotal  = i_nedges
+	  p_ghand%i_gnumber = p_ghand%i_gtotal
+	  p_ghand%i_gnumfine= p_ghand%i_gtotal
+
+!---------- create elements
+
+	  elmt_create: DO i_count=1,i_nelems
+	    elmt_boun: IF(i_ebn(i_count) == i_innerboun) THEN
+	      i_tmp= DEF_inner
+	    ELSE IF(i_ebn(i_count) == i_diriboun) THEN elmt_boun
+	      i_tmp= DEF_dirichlet
+	    ELSE IF(i_ebn(i_count) == i_neumboun) THEN elmt_boun
+	      i_tmp= DEF_neumann
+	    ELSE elmt_boun
+	      i_tmp= i_ebn(i_count)
+	    END IF elmt_boun
+	    p_etmp => create_elmt(i_end(:,i_count), i_eed(:,i_count), &
+	                          i_mark = i_eme(i_count), i_boundary= i_tmp, &
+				  i_level = 1, i_stat = 0)
+	    p_ehash(i_count)%ep   => p_etmp
+	    i_egrid(i_count,i_futuretime)=  i_count
+	    i_efine(i_count,i_futuretime)=  i_count
+	  END DO elmt_create
+
+!---------- elements created as well! update handles
+
+	  p_ghand%i_etotal  = i_nelems
+	  p_ghand%i_enumber = p_ghand%i_etotal
+	  p_ghand%i_enumfine= p_ghand%i_etotal
+
+!---------- create elements
+
+	  tetr_create: DO i_count=1,i_ntetrs
+	    p_ttmp => create_tetra(i_tnd(:,i_count), i_ted(:,i_count), &
+	                           i_tel(:,i_count), i_level = 1, i_stat = 0)
+	    p_thash(i_count)%tp   => p_ttmp
+	    i_tgrid(i_count,i_futuretime)=  i_count
+	    i_tfine(i_count,i_futuretime)=  i_count
+	  END DO tetr_create
+
+!---------- uff, tetrahedrons created, finally! update handles
+
+	  p_ghand%i_ttotal  = i_ntetrs
+	  p_ghand%i_tnumber = p_ghand%i_ttotal
+	  p_ghand%i_tnumfine= p_ghand%i_ttotal
+
+!---------- set global level info
+
+	  p_ghand%i_minlvl=1
+	  p_ghand%i_maxlvl=1
+
+!------ [TODOTODOTODO] --------
+!
+! DOFs initialisieren, 2D Versionn Zeile 615 anschauen
+!
+!------ [TODOTODOTODO] --------
+
+
+!---------- deallocate temporary workspace
+
+	  DEALLOCATE(r_coo)
+	  DEALLOCATE(i_gnd, i_gel, i_gne, i_gbn, i_end, i_eed, i_eme, i_ebn, &
+	             i_tnd, i_ted, i_tel)
+
+!---------- recover global time tag
+
+	  i_futuretime= i_tim
+
+	  RETURN
+ 2000	  FORMAT(a80)
+	  END SUBROUTINE grid_create
+
+	END MODULE FEM_inittriang

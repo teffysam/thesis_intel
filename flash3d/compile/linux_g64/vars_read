@@ -1,0 +1,2 @@
+nf_open => i_fileid
+nf_inq_dimid => i_dimid -> i_lat, i_lon, i_z, i_timesteps

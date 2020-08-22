@@ -1,0 +1,159 @@
+#!/bin/sh
+
+grid_coarse=""
+grid_fine=""
+timesteps=""
+help="0"
+
+circ="0"
+conv="0"
+diag="0"
+kaeser="0"
+
+Plain="0"
+Analytic="0"
+CW="0"
+MPSLM="0"
+Quad="0"
+
+execute="runFLASH "
+
+if (test -n "$1"); then
+  while (test -n "$1"); do
+    case "$1" in 
+  	-gc) 
+		if (test -n "$2"); then
+		  grid_coarse="$2"
+		  shift
+		else
+		  help="1"
+		fi ;;
+	-gf)
+		if (test -n "$2"); then
+		  grid_fine="$2"
+		  shift
+		else
+		  help="1"
+		fi ;;
+	-t)	
+		if (test -n "$2"); then
+		  timesteps=$2
+		  shift
+		else
+		  help="1"
+		fi ;;
+	-d)
+		execute=$execute"-d ";;
+	-gmv)
+		execute=$execute"-gmv ";;
+	-o)
+		execute=$execute"-o ";;
+	CircWind)	
+	  	circ="1";;
+	ConvWind)
+		conv="1";;
+	DiagWind)		  
+		diag="1";;
+	Kaeser)
+		kaeser="1";;
+	Plain)
+		Plain="1";;
+	Analytic)
+		Analytic="1";;
+	"CW"|"Dual")
+		CW="1";;
+	MPSLM)
+		MPSLM="1";;
+	"Quad"|"Quadrature")
+		Quad="1";;
+	all)
+		Plain="1"
+#		Analytic="1"
+		CW="1"
+		MPSLM="1"
+		Quad="1";;
+	"-?")
+		help="1";;
+	"-help")
+		help="1";;
+	"--help")
+		help="1";;
+	*)
+		echo "option unknown: "$1
+		echo "Try testreihe -help"
+		exit;;
+    esac
+    shift
+  done
+else
+  help="1"
+fi
+
+if (test -z "$grid_coarse") || (test -z "$grid_fine") || (test -z "$timesteps"); then
+  help="1"
+fi
+
+if test $help = "1"; then
+  echo "-------------------------------------"
+  echo "  testreihe Version 0.1-3D"
+  echo "  by Lars Mentrup 2004"
+  echo "-------------------------------------"
+  echo
+  echo "Usage: testreihe -gc # -gf # -t # [Analytic][CW][MPSLM][Quad] [CircWind][ConvWind][DiagWind][Kaeser]"
+  echo 
+  echo "Script to run multiple FLASH3D tests automatically." 
+  echo "Runs runFLASH corresponding to given Parameters."
+  echo "You can give multiple methods/winds on prompt." 
+  echo
+  echo "Specify the following options:"
+  echo
+  echo "  Essential parameters:"
+  echo "   -gc #         \t\tCoarse grid level"
+  echo "   -gf #         \t\tFine grid level"
+
+  echo "   -t #          \t\tNumber of timesteps "
+ 
+  echo 
+  echo "  Optional parameters:"
+  echo "   [method]      \t\tMethods to use (At least one of: Plain, CW, MPSLM, Quad, Analytic)"
+  echo "   [windfield]   \t\tWhat kind of winds to use (At least one of: CircWind, ConvWind, DiagWind, Kaeser)"
+  echo "   -d            \t\tturn diagnostics on (default: off)"
+  echo "   -gmv          \t\tturn GMV plot on (default: off)"
+  echo "   -o            \t\tsave output into File (default: off)"
+  echo
+  exit
+fi
+
+if test $circ = "1"; then
+  if test $Plain = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w CircWind -t $timesteps -m Plain; fi
+  if test $Analytic = "1"; then 	$execute -gf $grid_fine -gc $grid_coarse -w CircWind -t $timesteps -m Analytic; fi
+  if test $CW = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w CircWind -t $timesteps -m CW; fi
+  if test $MPSLM = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w CircWind -t $timesteps -m MPSLM; fi
+  if test $Quad = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w CircWind -t $timesteps -m Quad; fi
+fi
+
+
+if test $conv = "1"; then
+  if test $Plain = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w ConvWind -t $timesteps -m Plain; fi
+  if test $Analytic = "1"; then 	$execute -gf $grid_fine -gc $grid_coarse -w ConvWind -t $timesteps -m Analytic; fi
+  if test $CW = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w ConvWind -t $timesteps -m CW; fi
+  if test $MPSLM = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w ConvWind -t $timesteps -m MPSLM; fi
+  if test $Quad = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w ConvWind -t $timesteps -m Quad; fi
+fi
+
+
+if test "$diag" = "1";then
+  if test $Plain = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w DiagWind -t $timesteps -m Plain; fi
+  if test $Analytic = "1"; then 	$execute -gf $grid_fine -gc $grid_coarse -w DiagWind -t $timesteps -m Analytic; fi
+  if test $CW = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w DiagWind -t $timesteps -m CW; fi
+  if test $MPSLM = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w DiagWind -t $timesteps -m MPSLM; fi
+  if test $Quad = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w DiagWind -t $timesteps -m Quad; fi
+fi
+
+if test "$kaeser" = "1";then
+  if test $Plain = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w Kaeser -t $timesteps -m Plain; fi
+  if test $Analytic = "1"; then 	$execute -gf $grid_fine -gc $grid_coarse -w Kaeser -t $timesteps -m Analytic; fi
+  if test $CW = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w Kaeser -t $timesteps -m CW; fi
+  if test $MPSLM = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w Kaeser -t $timesteps -m MPSLM; fi
+  if test $Quad = "1"; then 		$execute -gf $grid_fine -gc $grid_coarse -w Kaeser -t $timesteps -m Quad; fi
+fi

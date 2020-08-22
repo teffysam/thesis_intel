@@ -1,0 +1,24 @@
+#-----------------------------------------------------------
+# Input file for batch mode input
+# input is controlled via keywords
+#
+# j. behrens 12/96, 11/2000
+#-----------------------------------------------------------
+# desired maximum level of refinements            [integer]
+FINE_GRID_LEVEL
+17
+# minimum level of refinements                    [integer]
+COARSE_GRID_LEVEL
+5
+# plot in matlab style to file (no plot = 0)      [integer]
+MATLAB_PLOTTING
+0
+# plot gmv compatible file (no plot = 0)          [integer]
+GMV_FILE_PLOTTING
+1
+# file defining the initial triangulation         [character]
+TRIANG_FILE_NAME
+Triang.dat
+#-----------------------------------------------------------
+# END OF FILE
+#-----------------------------------------------------------

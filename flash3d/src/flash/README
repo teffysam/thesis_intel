@@ -1,0 +1,48 @@
+**************************************************************************
+ FLASH90
+ FLexible Adaptive Semi-Lagrangian Hack
+ written in Fortran 90
+
+**************************************************************************
+
+ CONTENTS OF THIS DIRECTORY "$(FLASHDIR)/lib"
+
+ADV_rhs.f		- Module for calculating Right Hand Side
+ADV_rhs.gerrit		- Module for Right Hand Side (Aerosol Exper.)
+ADV_rhs.hom		- Module for Right Hand Side (homogeneous RHS)
+ADV_semilagrange.dual	- Module for SLM with dual grid approach
+ADV_semilagrange.f	- Module for SLM
+ADV_wind.bar		- Module for wind field (shear stress example)
+ADV_wind.constant	- Module for wind field (constant wind for Slotted Cyl.)
+ADV_wind.f		- Module for wind field
+ADV_wind.file		- Module for wind field (read wind field from file)
+Flash90.f		- Main program
+gridgen			- directory for the grid generator
+IO_plot.f		- Module for the plotting routines
+IO_plotdefine.f		- Module for definitions in plotting routines
+IO_utils.f		- Module for IO utility routines
+MISC_globalparam.f	- Module for global parameter definitions
+MISC_timing.f		- Module for the timing routines
+README			- this file
+SLM_errorestimate.f	- Module for the error estimation calculation
+SLM_initial.bar		- Module for the initial values (shear stress example)
+SLM_initial.f		- Module for the initial values 
+SLM_initial.file	- Module for the initial values (read from file)
+SLM_initial.gerrit	- Module for the initial values (Aerosol Exper.)
+SLM_initial.slot	- Module for the initial values (Slotted Cyl.)
+SLM_interpolation.clip	- Module for SLM interpolation (clipping)
+SLM_interpolation.cons	- Module for SLM interpolation (quasi conservative)
+SLM_interpolation.f	- Module for SLM interpolation 
+SLM_interpolation.plain	- Module for SLM interpolation (plain bicubic)
+system			- directory for system dependent routines
+utils			- directory for utility programs
+
+--------------------------------------------------------------------------
+
+ WHAT TO DO HERE:
+
+just look around, find better ways...
+
+**************************************************************************
+ j. behrens, 8/98
+**************************************************************************

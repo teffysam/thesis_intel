@@ -1,0 +1,472 @@
+!*****************************************************************
+!
+! MODULE NAME:
+!	SLM_initial
+! FUNCTION:
+!	initialize values for semi-Lagrangian advection
+!	provides slm_analyticsolution to evaluate error and mass 
+!	conservation
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_initialvalues
+! FUNCTION:
+!	initialize a grid with values
+! SYNTAX:
+!	CALL slm_initialvalues(grid)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! ON OUTPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for three dimensions only
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_initslicedsphere
+! FUNCTION:
+!	initialize a grid with values of sliced sphere test case
+! SYNTAX:
+!	CALL slm_initball(grid)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! ON OUTPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for three dimensions only
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_initcosinesphere
+! FUNCTION:
+!	initialize a grid with values of a cosine bell
+! SYNTAX:
+!	CALL slm_initball(grid)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! ON OUTPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for three dimensions only
+!-----------------------------------------------------------------
+! NAME:
+!	slm_analyticsolution
+! FUNCTION:
+!	calculates the 'analytic solution' to compare with in diagnostics
+! SYNTAX:
+!	CALL slm_analyticsolution(grid, real, int, real.arr)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+!	r_time:  model time			REAL
+!	i_arlen: array length for values array	INTEGER
+! ON OUTPUT:
+!	r_array: values at gridpoints		REAL
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for three dimensions only
+!
+!-----------------------------------------------------------------
+! NAME:
+!	slm_analyticsol_slicedsphere
+! FUNCTION:
+!	calculates the 'analytic solution' to compare with in diagnostics
+!	corresponds to sliced sphere initial values
+! SYNTAX:
+!	CALL slm_analyticsolution(grid, real, int, real.arr)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+!	r_time:  model time			REAL
+!	i_arlen: array length for values array	INTEGER
+! ON OUTPUT:
+!	r_array: values at gridpoints		REAL
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for three dimensions only
+!
+!-----------------------------------------------------------------
+! NAME:
+!	slm_analyticsol_cosinesphere
+! FUNCTION:
+!	calculates the 'analytic solution' to compare with in diagnostics
+!	corresponds to cosine sphere initial values
+! SYNTAX:
+!	CALL slm_analyticsolution(grid, real, int, real.arr)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+!	r_time:  model time			REAL
+!	i_arlen: array length for values array	INTEGER
+! ON OUTPUT:
+!	r_array: values at gridpoints		REAL
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for three dimensions only
+!
+!-----------------------------------------------------------------
+! PUBLIC:
+!	slm_initialvalues, slm_analyticsolution
+! COMMENTS:
+!
+! USES:
+!	MISC_globalparam, GRID_api
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	7/97
+!	2. names changed		j. behrens	7/97
+!	3. changed to use GRID_api	j. behrens	11/97
+!	4. changed interfaces		j. behrens	12/97
+!	5. compliant to amatos 1.0	j. behrens	12/2000
+!	6. sliced sphere test case	l. mentrup	12/2003 
+!
+!*****************************************************************
+	MODULE SLM_initial
+	  USE FLASH_parameters
+	  USE GRID_api
+	  PRIVATE
+	  PUBLIC slm_initialvalues, slm_analyticsolution
+	  REAL, DIMENSION(GRID_dimension) :: r_cntr=(/ 0.25, 0.5, 0.5 /)
+	  REAL                            :: r_hgt=1.0
+	  REAL                            :: r_srd=0.15
+	  CONTAINS
+!*****************************************************************
+	  SUBROUTINE slm_initialvalues(p_ghand)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), INTENT(in)             :: p_ghand
+	  INTEGER                                    :: i_lev= 6
+
+!---------- initialize some constant for the sliced sphere
+!	  CALL slm_initslicedsphere(p_ghand)
+
+!---------- initialize some constant for the cosine sphere
+	  CALL slm_initcosinesphere(p_ghand)
+
+	  RETURN
+	  END SUBROUTINE slm_initialvalues
+!*****************************************************************
+	  SUBROUTINE slm_analyticsolution(p_ghand, r_time, i_arlen, r_array)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), INTENT(in)              :: p_ghand
+	  REAL, INTENT(in)                            :: r_time
+	  INTEGER, INTENT(in)                         :: i_arlen
+	  REAL, DIMENSION(i_arlen), INTENT(out)       :: r_array
+
+!---------- this is a dummy
+!	  r_array= 0.0
+	  
+!---------- analyticsolution: sliced sphere
+!	  CALL slm_analyticsol_slicedsphere(p_ghand, r_time, i_arlen, r_array)
+	  
+!---------- analyticsolution: cosine sphere
+	  CALL slm_analyticsol_cosinesphere(p_ghand, r_time, i_arlen, r_array)
+
+
+
+	  RETURN
+	  END SUBROUTINE slm_analyticsolution
+	  
+!*****************************************************************
+	  SUBROUTINE slm_analyticsol_slicedsphere(p_ghand, r_time, i_arlen, r_array)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), INTENT(in)              :: p_ghand
+	  REAL, DIMENSION(GRID_dimension)             :: r_centr
+	  REAL                                        :: r_rds, r_dpt
+	  REAL					      :: r_rds_kreisbahn
+	  REAL, DIMENSION(GRID_dimension)             :: r_tmp
+	  REAL, INTENT(in)                            :: r_time
+	  REAL					      :: r_tim, r_time_one_turn
+	  REAL					      :: r_PI, r_phi	
+	  INTEGER, INTENT(in)                         :: i_arlen
+	  INTEGER                                     :: i_count, i_num, i_alct, i_step
+	  REAL, DIMENSION(i_arlen), INTENT(out)       :: r_array
+	  REAL, DIMENSION(:,:), ALLOCATABLE           :: r_coo
+	  
+
+
+!---------- initialize some constant for the tracer ball
+
+	  r_rds = r_srd
+
+!---------- here is the crux: where is the center of the ball at time r_time
+
+	  
+	  r_tim 		= r_time
+	  r_time_one_turn 	= 1800. * 96		! Time which the ball needs for one turn around the center
+	  r_PI 			= GRID_PI
+	  r_phi			= r_PI			! Phasenwinkel um die Anfangskonstellation zu beruecksichtigen
+	  r_centr		= r_cntr
+	  r_rds_kreisbahn	= 0.25
+
+	  r_centr(1) 		= r_rds_kreisbahn * COS(2*r_PI * r_tim/r_time_one_turn + r_phi)	!Beschreibung der Kreisbahn um den Ursprung
+	  r_centr(2) 		= r_rds_kreisbahn * SIN(2*r_PI * r_tim/r_time_one_turn + r_phi) !Beschreibung der Kreisbahn um den Ursprung
+ 
+	  r_centr(1)		= r_centr(1) + 0.5	! Ins richtige Koordinatensystem
+	  r_centr(2)		= r_centr(2) + 0.5	! Ins richtige Koordsys verschieben
+
+	  IF (r_tim == 0.0) THEN
+	    r_centr= r_cntr
+	  ENDIF
+
+
+!---------- allocate workspace
+	  
+	  i_num= p_ghand%i_nnumber
+	  ALLOCATE(r_coo(GRID_dimension,i_num), stat=i_alct)
+          IF(i_alct /= 0) THEN
+		CALL grid_error(55)
+	  END IF	
+
+!---------- get information
+
+	  CALL grid_getinfo(p_ghand, i_num, r_nodecoordinates= r_coo)
+	
+
+!---------- for every quarter revolt: test if is node in or out of the sliced sphere and set r_array	  		
+	  r_array = 0.0
+	  node_loop: DO i_count= 1, i_num
+	    r_tmp(:) = r_coo(:,i_count) - r_centr(:)
+	    r_dpt    = dot_product(r_tmp, r_tmp)**0.5
+	    r_array(i_count) = 0.
+	    i_step=INT(r_tim) / 1800 
+	    i_step=MODULO(i_step,96)
+	    SELECT CASE (i_step)
+	      CASE(0) 
+	      	start_pos:IF(r_dpt <= r_rds .AND. .NOT.(r_tmp(2) <= 0. .AND. (r_tmp(1)<=0.03 .AND. r_tmp(1)>=-0.03))) THEN
+	          r_array(i_count)= r_hgt
+	      	END IF start_pos
+	      CASE(24)
+	      	quarter_pos:IF(r_dpt <= r_rds .AND. .NOT.(r_tmp(1) >= 0. .AND. (r_tmp(2)<=0.03 .AND. r_tmp(2)>=-0.03))) THEN
+	          r_array(i_count)= r_hgt
+	      	END IF quarter_pos
+	      CASE(48)
+	      	half_pos:IF(r_dpt <= r_rds .AND. .NOT.(r_tmp(2) >= 0. .AND. (r_tmp(1)<=0.03 .AND. r_tmp(1)>=-0.03))) THEN
+	          r_array(i_count)= r_hgt
+	      	END IF half_pos
+	      CASE(72)
+	      	third_quarter_pos:IF(r_dpt <= r_rds .AND. .NOT.(r_tmp(1) <= 0. .AND. (r_tmp(2)<=0.03 .AND. r_tmp(2)>=-0.03))) THEN
+	          r_array(i_count)= r_hgt
+	      	END IF third_quarter_pos
+	     END SELECT
+	  END DO node_loop
+
+	
+!---------- deallocate workspace
+
+	  DEALLOCATE(r_coo)
+
+
+	  RETURN
+	  END SUBROUTINE slm_analyticsol_slicedsphere
+
+!*****************************************************************
+	  SUBROUTINE slm_initslicedsphere(p_ghand)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), INTENT(in)             :: p_ghand
+	  REAL, DIMENSION(GRID_dimension)            :: r_centr
+	  REAL                                       :: r_rds, r_dpt
+	  REAL, DIMENSION(GRID_dimension)            :: r_tmp
+	  INTEGER                                    :: i_count, i_num, i_alct
+	  REAL, DIMENSION(:), ALLOCATABLE            :: r_aux
+	  REAL, DIMENSION(:,:), ALLOCATABLE          :: r_coo
+
+!---------- initialize some constant for the sliced sphere
+
+	  r_rds= r_srd
+	  r_centr= r_cntr
+
+!---------- allocate workspace
+
+	  i_num= p_ghand%i_nnumber
+	  ALLOCATE(r_aux(i_num), r_coo(GRID_dimension,i_num), stat= i_alct)
+	  IF(i_alct /= 0) THEN
+	    CALL grid_error(55)
+	  END IF
+
+!---------- get information
+
+	  CALL grid_getinfo(p_ghand, i_num, r_nodecoordinates= r_coo)
+
+!---------- loop over the nodes
+
+	  node_loop: DO i_count= 1, i_num
+	    r_aux(i_count)= 0.0
+	    r_tmp(:)      = r_coo(:,i_count)- r_centr(:)
+	    r_dpt= dot_product(r_tmp, r_tmp)**0.5
+	    inside: IF(r_dpt <= r_rds .AND. .NOT.(r_tmp(2) <= 0. .AND. (r_tmp(1)>=-0.03 .AND. r_tmp(1)<=0.03))) THEN
+	      r_aux(i_count)= r_hgt
+	    END IF inside
+	  END DO node_loop
+
+!---------- update grid information
+
+	  CALL grid_putinfo(p_ghand, i_num, i_valpoint= GRID_tracer, r_nodevalues= r_aux)
+
+!---------- deallocate workspace
+
+	  DEALLOCATE(r_aux, r_coo)
+
+	  RETURN
+	  END SUBROUTINE slm_initslicedsphere
+!*****************************************************************
+	  SUBROUTINE slm_analyticsol_cosinesphere(p_ghand, r_time, i_arlen, r_array)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), INTENT(in)              :: p_ghand
+	  REAL, DIMENSION(GRID_dimension)             :: r_centr
+	  REAL                                        :: r_rds, r_dpt
+	  REAL					      :: r_rds_kreisbahn
+	  REAL, DIMENSION(GRID_dimension)             :: r_tmp
+	  REAL, INTENT(in)                            :: r_time
+	  REAL					      :: r_tim, r_time_one_turn
+	  REAL					      :: r_PI, r_phi	
+	  INTEGER, INTENT(in)                         :: i_arlen
+	  INTEGER                                     :: i_count, i_num, i_alct, i_step
+	  REAL, DIMENSION(i_arlen), INTENT(out)       :: r_array
+	  REAL, DIMENSION(:,:), ALLOCATABLE           :: r_coo
+	  
+
+
+!---------- initialize some constant for the tracer ball
+
+	  r_rds = r_srd
+
+!---------- here is the crux: where is the center of the ball at time r_time
+
+	  
+	  r_tim 		= r_time
+	  r_time_one_turn 	= 1800. * 96		! Time which the ball needs for one turn around the center
+	  r_PI 			= GRID_PI
+	  r_phi			= r_PI			! Phasenwinkel um die Anfangskonstellation zu beruecksichtigen
+	  r_centr		= r_cntr
+	  r_rds_kreisbahn	= 0.25
+
+	  r_centr(1) 		= r_rds_kreisbahn * COS(2*r_PI * r_tim/r_time_one_turn + r_phi)	!Beschreibung der Kreisbahn um den Ursprung
+	  r_centr(2) 		= r_rds_kreisbahn * SIN(2*r_PI * r_tim/r_time_one_turn + r_phi) !Beschreibung der Kreisbahn um den Ursprung
+ 
+	  r_centr(1)		= r_centr(1) + 0.5	! Ins richtige Koordinatensystem
+	  r_centr(2)		= r_centr(2) + 0.5	! Ins richtige Koordsys verschieben
+
+	  IF (r_tim == 0.0) THEN
+	    r_centr= r_cntr
+	  ENDIF
+
+
+!---------- allocate workspace
+	  
+	  i_num= p_ghand%i_nnumber
+	  ALLOCATE(r_coo(GRID_dimension,i_num), stat=i_alct)
+          IF(i_alct /= 0) THEN
+		CALL grid_error(55)
+	  END IF	
+
+!---------- get information
+
+	  CALL grid_getinfo(p_ghand, i_num, r_nodecoordinates= r_coo)
+	
+
+!---------- for every quarter revolt: test if is node in or out of the sliced sphere and set r_array	  		
+	  r_array = 0.0
+	  node_loop: DO i_count= 1, i_num
+	    r_tmp(:) = r_coo(:,i_count) - r_centr(:)
+	    r_dpt    = dot_product(r_tmp, r_tmp)**0.5
+	    r_array(i_count) = 0.
+	    IF (r_dpt <= r_rds) THEN
+	      r_array(i_count) = r_hgt* cos(r_dpt*(r_PI/(2*r_rds)))
+	    END IF
+	  END DO node_loop
+
+	
+!---------- deallocate workspace
+
+	  DEALLOCATE(r_coo)
+
+
+	  RETURN
+	  END SUBROUTINE slm_analyticsol_cosinesphere
+
+!*****************************************************************
+	  SUBROUTINE slm_initcosinesphere(p_ghand)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), INTENT(in)             :: p_ghand
+	  REAL, DIMENSION(GRID_dimension)            :: r_centr
+	  REAL                                       :: r_rds, r_dpt
+	  REAL, DIMENSION(GRID_dimension)            :: r_tmp
+	  INTEGER                                    :: i_count, i_num, i_alct
+	  REAL, DIMENSION(:), ALLOCATABLE            :: r_aux
+	  REAL, DIMENSION(:,:), ALLOCATABLE          :: r_coo
+
+!---------- initialize some constant for the sliced sphere
+
+	  r_rds= r_srd
+	  r_centr= r_cntr
+
+!---------- allocate workspace
+
+	  i_num= p_ghand%i_nnumber
+	  ALLOCATE(r_aux(i_num), r_coo(GRID_dimension,i_num), stat= i_alct)
+	  IF(i_alct /= 0) THEN
+	    CALL grid_error(55)
+	  END IF
+
+!---------- get information
+
+	  CALL grid_getinfo(p_ghand, i_num, r_nodecoordinates= r_coo)
+
+!---------- loop over the nodes
+
+	  node_loop: DO i_count= 1, i_num
+	    r_aux(i_count)= 0.0
+	    r_tmp(:)      = r_coo(:,i_count)- r_centr(:)
+	    r_dpt= dot_product(r_tmp, r_tmp)**0.5
+	    inside: IF(r_dpt <= r_rds) THEN
+	      r_aux(i_count)= r_hgt*cos(r_dpt*(GRID_PI/(2*r_rds)))
+	    END IF inside
+	  END DO node_loop
+
+!---------- update grid information
+
+	  CALL grid_putinfo(p_ghand, i_num, i_valpoint= GRID_tracer, r_nodevalues= r_aux)
+
+!---------- deallocate workspace
+
+	  DEALLOCATE(r_aux, r_coo)
+
+	  RETURN
+	  END SUBROUTINE slm_initcosinesphere
+	END MODULE SLM_initial

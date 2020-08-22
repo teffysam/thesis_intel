@@ -1,0 +1,30 @@
+**************************************************************************
+ FLASH90
+ FLexible Adaptive Semi-Lagrangian Hack
+ written in Fortran 90
+
+**************************************************************************
+
+ CONTENTS OF THIS DIRECTORY "$(FLASHDIR)/doc"
+
+README		- this file
+sources		- Directory containing the editable sources to some ps files
+Dataflow.eps	- Diagram showing the main dataflow structure
+Datastruct.eps	- Grid data structure (nodes, edges, elements)
+GridFlow.ps	- Flow Diagrams of the main routines
+InputDok.ps	- Input file formats for FLASH
+Triang.ps	- Initial triangulation example
+grids.ps	- grids, distorted grids nd their duals
+netcdf.doc	- some remarks on netcdf
+para-grid.eps	- Idea of the parallel grid generator
+structure.ps	- Main structure of cfiles.c (graphics)
+
+--------------------------------------------------------------------------
+
+ WHAT TO DO HERE:
+ 
+enjoy the documentation as it is... :-)
+
+**************************************************************************
+ j. behrens, 3/99
+**************************************************************************

@@ -1,0 +1,313 @@
+!*****************************************************************
+!
+! MODULE NAME:
+!	SLM_initial
+! FUNCTION:
+!	initialize slotted cylinder for semi-Lagrangian advection
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_initialvalues
+! FUNCTION:
+!	initialize a grid with values
+! SYNTAX:
+!	CALL slm_initialvalues(grid)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! ON OUTPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for two dimensions only
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_initbar
+! FUNCTION:
+!	initialize a grid with values of a bar
+! SYNTAX:
+!	CALL slm_initbar(grid)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! ON OUTPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for two dimensions only
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_analyticsolution
+! FUNCTION:
+!	calculates the 'analytic solution' to compare with in diagnostics
+! SYNTAX:
+!	CALL slm_analyticsolution(grid, real, int, real.arr)
+! ON INPUT:
+!	p_ghand: grid handle			TYPE (grid_handle)
+!	r_time:  model time			REAL
+!	i_arlen: array length for values array	INTEGER
+! ON OUTPUT:
+!	r_array: values at gridpoints		REAL
+! CALLS:
+!
+! COMMENTS:
+!	the routine is made for two dimensions only
+!
+!-----------------------------------------------------------------
+!
+! PUBLIC:
+!	slm_initialvalues, slm_analyticsolution
+! COMMENTS:
+!
+! USES:
+!	MISC_globalparam, MISC_error, GRID_api
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	7/97
+!	2. names changed		j. behrens	7/97
+!	3. changed to use GRID_api	j. behrens	11/97
+!	4. changed interfaces		j. behrens	12/97
+!	5. compliant to amatos 1.0	j. behrens	12/2000
+!
+!*****************************************************************
+	MODULE SLM_initial
+	  USE FLASH_parameters
+	  USE GRID_api
+	  PRIVATE
+	  PUBLIC slm_initialvalues, slm_analyticsolution
+	  REAL                            :: r_hgt=4.0
+	  REAL                            :: r_srd=0.15
+	  REAL                            :: r_sln=0.22
+	  REAL                            :: r_swd=0.06
+	  REAL, DIMENSION(:,:), ALLOCATABLE          :: r_nox
+	  REAL, DIMENSION(:,:), ALLOCATABLE          :: r_co
+	  INTEGER                                    :: i_nx, i_ny
+	  REAL                            :: r_dx= 2000.0
+	  REAL                            :: r_dy= 2000.0
+	  REAL                            :: r_dxi= 1./2000.0
+	  REAL                            :: r_dyi= 1./2000.0
+	  CONTAINS
+!*****************************************************************
+	  SUBROUTINE slm_initialvalues(p_ghand)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), INTENT(in)             :: p_ghand
+
+!---------- initialize some constant for the slotted cylinder
+
+	  CALL slm_initcdf(p_ghand)
+
+	  RETURN
+	  END SUBROUTINE slm_initialvalues
+!*****************************************************************
+	  SUBROUTINE slm_analyticsolution(p_ghand, r_time, i_arlen, r_array)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), INTENT(in)              :: p_ghand
+	  REAL, INTENT(in)                            :: r_time
+	  INTEGER, INTENT(in)                         :: i_arlen
+	  REAL, DIMENSION(i_arlen), INTENT(out)       :: r_array
+
+!---------- dummy routine
+
+	  r_array= 0.0
+
+	  RETURN
+	  END SUBROUTINE slm_analyticsolution
+
+!*****************************************************************
+	  SUBROUTINE slm_initcdf(p_ghand)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  
+	  INCLUDE 'netcdf.inc'
+
+	  TYPE (grid_handle), INTENT(in)             :: p_ghand
+	  REAL                                       :: r_xsw, r_ysw, r_zsw, r_xne, r_yne, r_zne
+	  REAL                                       :: r_scal, r_fac
+	  INTEGER                                    :: i_num, i_alct
+	  REAL, DIMENSION(:), ALLOCATABLE            :: r_aux
+	  REAL, DIMENSION(:,:), ALLOCATABLE          :: r_coord
+	  CHARACTER (len=10)                         :: c_name='NOx_CO.cdf'
+	  CHARACTER (len=32)                         :: c_vname
+	  INTEGER                                    :: i_iost, i_cnt
+	  INTEGER                                    :: i_numdim, i_vars
+	  INTEGER                                    :: i_ioncin, i_atts, i_type
+	  INTEGER, DIMENSION(NF_MAX_VAR_DIMS)        :: i_dim, i_strt, i_vardim, i_count
+
+!---------- open NetCDF file with initial data
+
+	  i_iost= nf_open(c_name, NF_NOWRITE, i_ioncin)
+	  file_notopen: IF(i_iost /= NF_NOERR) THEN
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) 'ERROR: Filename: ', c_name
+	    CALL grid_error(c_error='[slm_initcdf]: Could not open NetCDF file')
+	  END IF file_notopen
+
+!---------- inquire data file: number of variables
+
+	  i_iost= nf_inq_nvars(i_ioncin, i_vars)
+	  IF(i_vars /= 2) CALL grid_error(c_error='[slm_initcdf]: Invalid NetCDF file, only 2 field variables allowed')
+
+!---------- inquire wind data file: number of defined dimensions
+
+	  i_iost= nf_inq_ndims(i_ioncin, i_numdim)
+	  IF(i_iost /= NF_NOERR) CALL grid_error(c_error='[slm_initcdf]: Could not inquire dimensions!')
+
+!---------- inquire dimension lengths
+
+	  DO i_cnt=1,i_numdim
+	    i_iost= nf_inq_dim(i_ioncin, i_cnt, c_vname, i_vardim(i_cnt))
+	  END DO
+	  i_strt= 1
+
+	  DO i_cnt=1,i_vars
+	    i_iost= nf_inq_var(i_ioncin, i_cnt, c_vname, i_type, i_numdim, i_dim, i_atts)
+	    IF(i_type /= NF_REAL) THEN
+	      CALL grid_error(c_error='[slm_initcdf]: Invalid data type for init field')
+	    END IF
+	    IF(i_numdim < 2) THEN
+	      CALL grid_error(c_error='[slm_initcdf]: Invalid number of field dimensions (should be 2)')
+	    END IF
+	    IF(i_cnt == 1) THEN
+	      i_nx     = i_vardim(i_dim(1))
+	      i_ny     = i_vardim(i_dim(2))
+	      ALLOCATE(r_nox(i_nx, i_ny), stat=i_iost)
+	      IF(i_iost /= 0) THEN
+	        CALL grid_error(c_error='[slm_initcdf]: Could not allocate NOx field array!')
+	      END IF
+	      i_count(1:2)= i_vardim(i_dim(1:2))
+	      i_iost= nf_get_vara_real(i_ioncin, i_cnt, i_strt(1:2), i_count(1:2), r_nox)
+	      IF(i_iost /= NF_NOERR) THEN
+	        CALL grid_error(c_error='[slm_initcdf]: Could not read NOx field array!')
+	      END IF
+	    END IF
+	    IF(i_cnt == 2) THEN
+	      IF(i_vardim(i_dim(1)) /= i_nx) CALL grid_error(c_error='[slm_initcdf]: Invalid number of x-values in CO field array!')
+	      IF(i_vardim(i_dim(2)) /= i_ny) CALL grid_error(c_error='[slm_initcdf]: Invalid number of y-values in CO field array!')
+	      ALLOCATE(r_co(i_nx, i_ny), stat=i_iost)
+	      IF(i_iost /= 0) THEN
+	        CALL grid_error(c_error='[slm_initcdf]: Could not allocate CO field array!')
+	      END IF
+	      i_count(1:2)= i_vardim(i_dim(1:2))
+	      i_iost= nf_get_vara_real(i_ioncin, i_cnt, i_strt(1:2), i_count(1:2), r_co)
+	      IF(i_iost /= NF_NOERR) THEN
+	        CALL grid_error(c_error='[slm_initcdf]: Could not read CO field array!')
+	      END IF
+	    END IF
+	  END DO
+
+!---------- close data file
+
+	  i_iost= nf_close(i_ioncin)
+
+!---------- initialize some constants for the bar
+
+	  r_zne= 800.0
+	  r_scal= GRID_PI*0.5/r_zne
+
+!---------- allocate workspace
+
+	  i_num= p_ghand%i_nnumber
+
+	  ALLOCATE(r_aux(i_num), r_coord(GRID_dimension,i_num), stat= i_alct)
+	  IF(i_alct /= 0) THEN
+	    CALL grid_error(51)
+	  END IF
+
+!---------- get information
+
+	  CALL grid_getinfo(p_ghand, i_num, r_nodecoordinates= r_coord)
+
+!---------- loop over the nodes
+
+	  node_loop: DO i_cnt= 1, i_num
+	    r_aux(i_cnt)= 0.0
+	    inside: IF(r_coord(3,i_cnt)<r_zne) THEN
+	      r_fac= cos(r_coord(3,i_cnt)*r_scal)
+! 	      r_fac= 1.0
+	      r_aux(i_cnt)= r_fac* data_interpol(r_coord(:,i_cnt))
+	    END IF inside
+	  END DO node_loop
+
+!---------- update grid information
+
+	  CALL grid_putinfo(p_ghand, i_num, i_valpoint= GRID_tracer, r_nodevalues= r_aux)
+
+!---------- deallocate workspace
+
+	  DEALLOCATE(r_aux, r_coord)
+	  DEALLOCATE(r_nox, r_co)
+
+	  RETURN
+	  END SUBROUTINE slm_initcdf
+!*****************************************************************
+	  FUNCTION data_interpol(r_coord) RESULT (r_inter)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL, DIMENSION(GRID_dimension) :: r_coord
+	  REAL                            :: r_inter
+	  INTEGER                         :: i_lox, i_hix, i_loy, i_hiy
+	  REAL                            :: r_lx, r_hx, &
+	    r_ly, r_hy, r_l1, r_h1, r_l2, r_h2
+
+!---------- find wind box corresponding to coordinate
+
+	  i_lox= FLOOR(r_coord(1)*r_dxi)
+	  i_loy= FLOOR(r_coord(2)*r_dyi)
+!-- preliminary bug fix
+	  IF(i_lox < 1) i_lox=1
+	  IF(i_lox >= i_nx) i_lox= i_nx-1
+	  IF(i_loy < 1) i_loy=1
+	  IF(i_loy >= i_ny) i_loy= i_ny-1
+!-- end of preliminary bug fix
+	  i_hix= i_lox+ 1
+	  i_hiy= i_loy+ 1
+
+!---------- calculate weights for bilinear interpolation
+
+	  r_lx= r_coord(1) - (r_dx* REAL(i_lox-1))
+	  IF(i_lox == 1) r_lx= r_coord(1)
+	  r_ly= r_coord(2) - (r_dy* REAL(i_loy-1))
+	  IF(i_loy == 1) r_ly= r_coord(2)
+	  r_hx= (r_dx* REAL(i_hix-1)) - r_coord(1)
+	  r_hy= (r_dy* REAL(i_hiy-1)) - r_coord(2)
+
+!---------- linear interpolation in x-direction
+
+! 	  r_l1= (r_hx* r_co(i_lox, i_loy)+ &
+! 	  	 r_lx* r_co(i_hix, i_loy))* r_dxi
+! 	  r_h1= (r_hx* r_co(i_lox, i_hiy)+ &
+! 	  	 r_lx* r_co(i_hix, i_hiy))* r_dxi
+	  r_l2= (r_hx* r_nox(i_lox, i_loy)+ &
+	  	 r_lx* r_nox(i_hix, i_loy))* r_dxi
+	  r_h2= (r_hx* r_nox(i_lox, i_hiy)+ &
+	  	 r_lx* r_nox(i_hix, i_hiy))* r_dxi
+
+!---------- linear interpolation in y-direction
+
+! 	  r_inter= (r_hy* r_l1+ r_ly* r_h1)* r_dyi
+	  r_inter= (r_hy* r_l2+ r_ly* r_h2)* r_dyi
+
+	  RETURN
+	  END FUNCTION data_interpol
+
+	END MODULE SLM_initial

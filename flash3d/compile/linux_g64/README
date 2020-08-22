@@ -1,0 +1,68 @@
+**************************************************************************
+ FLASH90
+ FLexible Adaptive Semi-Lagrangian Hack
+ written in Fortran 90
+
+**************************************************************************
+
+ CONTENTS OF THIS DIRECTORY "$(FLASHDIR)/linux"
+
+Makefile	- Makefile
+Makefile.nogr	- Makefile (for non-OpenGL machine)
+Parameters.dat	- Input data 
+README		- this file
+
+--------------------------------------------------------------------------
+
+ WHAT TO DO HERE:
+
+In order to create and run an executable there are severel steps to be taken:
+
+FIRST: If not already done, go to directory $(FLASHDIR)/lib to create a
+library libuGL.a. The steps are described there.
+
+SECOND: Build a grid generator library libgapi.a: Type
+   make serialcopy
+   make seriallib
+
+THIRD: create a taylored executable. The simplest way to do so is:
+   make maincopy
+   make executable
+See for the alternatives below.
+
+FOURTH: Copy data files to run the executable:
+   make datacopy
+
+FIFTH: To run the executable, type
+   FLASH -h
+This will print out a help screen describing the options of FLASH
+   FLASH -b -f Parameters.dat
+will run FLASH in batch mode, where the input parameters are read from
+Parameters.dat.
+   FLASH -i
+will run FLASH in interactive input mode, opening an input window where every
+input parameter has to be set manually.
+
+ALTERNATIVES:
+
+You may choose different taylored Executables. In the THIRD Step you may type
+one of the following instead of "make maincopy":
+
+1. make Slot
+   this will create an executable calculating the Slotted Cylinder Test Case
+
+2. make Dual
+   this has to be called additionally to any of the others. It creates an
+   executable with the dual grid interpolation approach.
+
+3. make Gerrit
+   this will create an executable suitable for the Aerosol Experiment with
+   Gerrit Lohmann.
+
+4. Make Potsdam
+   this will create an executable for the Tracer Experiments with Klaus Dethloff
+   and Annette Rinke.
+
+**************************************************************************
+ j. behrens, 8/98, 3/99
+**************************************************************************

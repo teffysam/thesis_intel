@@ -1,0 +1,2402 @@
+!*****************************************************************
+!
+! MODULE NAME:
+!	SLM_advanced
+! FUNCTION:
+!	provide simple semi-Lagrangian routines
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_astep
+! FUNCTION:
+!	one step of the basic SLM algorithm
+! SYNTAX:
+!	CALL slm_astep(int, real.arr, real.arr)
+! ON INPUT:
+!	...
+! ON OUTPUT:
+!	r_tracer: array with tracer values	real
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_adisplace
+! FUNCTION:
+!	extrapolate the alpha, values for the displacements of the upstream
+!	points from the gridpoints
+! SYNTAX:
+!	CALL slm_adisplace(int, real.arr, real.arr)
+! ON INPUT:
+!	i_arlen: array length for the real arrays	integer
+!	r_coord: real array of xy-coordinates		real
+! ON OUTPUT:
+!	r_alpha: displacement vectors to each point	real
+! CALLS:
+!	wind_field
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_aupdate
+! FUNCTION:
+!	calculate the update to the velocity
+! SYNTAX:
+!	CALL slm_aupdate(int, real.arr, real.arr)
+! ON INPUT:
+!	i_arlen: array length for the real arrays	integer
+!	r_rside: array with right hand side values	real
+! ON OUTPUT:
+!	r_udate: array with new (updated) gid values	real
+! CALLS:
+!
+! COMMENTS:
+!	this routine is trivial for linear advection
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_aupstream
+! FUNCTION:
+!	calculate right hand side of the equation (upstream values)
+! SYNTAX:
+!	CALL slm_aupstream(int, real.arr, real.arr)
+! ON INPUT:
+!	i_arlen: array length for the real arrays	integer
+!	r_alpha: displacement vectors to each point	real
+! ON OUTPUT:
+!	r_rside: array with right hand side values	real
+! CALLS:
+!
+! COMMENTS:
+!	this routine is just interpolation for linear advection
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_ainterpolate
+! FUNCTION:
+!	do the interpolation
+! SYNTAX:
+!	CALL slm_ainterpolate(grid, int, real, real.arr, real.arr, real.arr)
+! ON INPUT:
+!	p_ogrid: grid handle to old grid (with data)	TYPE (grid_handle)
+!	r_fac:   factor at which point to interpolate	REAL
+!	i_arlen: array length for the following arrays	INTEGER
+!	r_coord: coordinate array (new grid)		REAL
+!	r_alpha: displacement array (corr. to r_coord)	REAL
+!	r_value: values on the old grid (array)		REAL
+! ON OUTPUT:
+!	r_rside: right hand side (interpolated)		REAL
+! CALLS:
+!
+! COMMENTS:
+!	this one is plain bi-cubic spline interpolation
+!
+!-----------------------------------------------------------------
+!
+! PUBLIC:
+!	slm_astep
+! COMMENTS:
+!
+! USES:
+!	FLASH_parameters, GRID_api, ADV_wind, ADV_rhs
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	12/2002
+!
+!*****************************************************************
+	MODULE SLM_advanced
+	  USE FLASH_parameters
+	  USE MISC_timing
+	  USE GRID_api
+	  USE ADV_wind
+	  USE ADV_rhs
+	  
+!*****************************************************************
+
+	IMPLICIT NONE
+
+	INTEGER, SAVE                   	:: MAX_REFLVL
+
+!---------- Begin Tetra table
+
+	TYPE conservation_entry
+	  INTEGER                 		:: i_MPperTetra
+	  INTEGER, POINTER			:: i_MPindex(:)            	! index array of the MP evoked by the tetra (165 for a maximum of 8 refinement levels)
+	  INTEGER            			:: i_refinelvl          	! refinement level (1,2 for 4 or 10 MPs per tetra so far)
+	  LOGICAL       	      		:: l_valueassigned
+	  LOGICAL   	          		:: l_searchtetra
+	  LOGICAL             			:: l_refine
+	  REAL                			:: r_volume
+	  REAL, DIMENSION(GRID_tetranodes)    	:: r_value          		! mass per corner point of the tetras
+	END TYPE conservation_entry
+
+
+	TYPE conservation_entry_ptr
+	  TYPE(conservation_entry), POINTER   	:: cp
+	END TYPE conservation_entry_ptr
+
+
+	TYPE (conservation_entry_ptr), DIMENSION(:,:), ALLOCATABLE, SAVE :: p_ttable  
+	
+!---------- End Tetra table
+
+
+!---------- Begin Mass Point Coefficient table
+
+	!------ coefficient container to generate one mass point
+	TYPE MP_coeff                   
+	  INTEGER               		:: i_origin 	! index of the originating tetranode
+	  INTEGER, DIMENSION(3)         	:: i_prvdir 	! prev direction of the tree
+	  INTEGER               		:: i_celltype   ! 1: @corner, 2: @edge, 3: @face, 4: in tetra
+	  REAL                  		:: r_volume 	! volume of the mass point's cell
+	  REAL, DIMENSION(GRID_tetranodes)  	:: r_coeff  	! coefficients to compute the coordinates of the mass point
+	  REAL, DIMENSION(GRID_tetranodes)  	:: r_mass   	! defines how much mass per node will be assigned
+	  LOGICAL               		:: l_end    	! end of tree? if TRUE, then create new branches in next refinement level
+	END TYPE MP_coeff
+
+
+	! array of MassPoint coefficients, to generate Mass Points of a tetra for a certain reflvl
+	TYPE MP_coeff_arr                   
+	  TYPE (MP_coeff), POINTER      	:: mpc(:)   	!
+	END TYPE MP_coeff_arr
+
+
+	TYPE MP_coeff_arr_ptr
+	  INTEGER               		:: i_cnum   	! number of cells/mass points, each cell has a mass point
+	  TYPE (MP_coeff_arr), POINTER      	:: p_mpc    	! pointer to the mass point coefficient array
+	END TYPE MP_coeff_arr_ptr
+
+
+	TYPE (MP_coeff_arr_ptr), DIMENSION(:), ALLOCATABLE, SAVE    :: p_MPCtable   ! pointer to the coefficient array of each reflvl
+	 
+	   
+!----------
+      
+      
+      
+!---------- Begin Mass point table  
+   
+	TYPE MP_entry
+	  INTEGER                       	:: i_MPinTetra
+	  INTEGER                       	:: i_MPbyTetra
+	  REAL                          	:: r_mass
+	  REAL                              	:: r_volume
+	  REAL, DIMENSION (GRID_dimension)	:: r_coord
+	  LOGICAL                       	:: l_searchMP
+ 	  LOGICAL                       	:: l_assignvalue
+	END TYPE MP_entry
+
+
+	TYPE MP_entry_ptr
+	  TYPE (MP_entry), POINTER         	:: MP
+	END TYPE MP_entry_ptr 
+	  
+!---------- End Mass point table  
+
+
+!*****************************************************************
+
+	 
+	  PRIVATE
+	  PUBLIC  :: slm_astep, slm_interpolinit, slm_interpolquit
+	  CONTAINS
+!*****************************************************************
+	  SUBROUTINE slm_astep(p_ghand, p_param, p_time, r_modtime, i_size, &
+	                       r_coord, r_tracer)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), DIMENSION(GRID_timesteps), INTENT(in) :: p_ghand
+	  TYPE (control_struct), INTENT(in)                         :: p_param
+	  TYPE (sw_info), INTENT(inout)                             :: p_time
+	  REAL, INTENT(in)                                          :: r_modtime
+	  INTEGER, INTENT(in)                                       :: i_size
+	  REAL, DIMENSION(GRID_dimension,i_size), INTENT(in)        :: r_coord
+	  REAL, DIMENSION(i_size), INTENT(out)                      :: r_tracer
+	  
+	  REAL, DIMENSION(:), ALLOCATABLE                           :: r_newvl
+	  REAL, DIMENSION(:,:), ALLOCATABLE                         :: r_alpha
+	  INTEGER                                                   :: i_alct
+
+!---------- check size!
+
+	  IF(i_size <= 0) THEN
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) 'INFO [slm_astep]: Zero step size, returning to calling routine'
+	    RETURN
+	  END IF
+
+!---------- allocate auxiliary arrays
+
+	  allocate(r_newvl(i_size), r_alpha(GRID_dimension,i_size), stat=i_alct)
+	  not_alloc: IF(i_alct /= 0) THEN
+	    CALL grid_error(c_error='[slm_astep]: could not allocate aux. arrays')
+	  END IF not_alloc
+
+!-SLM--------- calculate trajectory pieces (displacements)
+
+	  CALL stop_watch('start',3,p_time)
+	  CALL slm_adisplace(p_param, i_size, r_coord, r_alpha, r_time=r_modtime)
+	  CALL stop_watch('stop ',3,p_time)
+
+!-SLM--------- calculate right hand side
+
+	  CALL stop_watch('start',4,p_time)
+	  CALL slm_aupstream(p_ghand, i_size, r_coord, r_alpha, r_newvl)
+	  CALL stop_watch('stop ',4,p_time)
+
+!-SLM--------- calculate new grid values
+
+	  CALL stop_watch('start',5,p_time)
+	  CALL slm_aupdate(p_param, i_size, r_coord, r_newvl, r_tracer, r_time=r_modtime)
+	  CALL stop_watch('stop ',5,p_time)
+
+!-SLM--------- put alpha values to u and v field entries
+
+	  r_alpha= -r_alpha
+	  CALL grid_putinfo(p_ghand(i_timeplus), i_size, r_nodevalues=r_alpha(1,:), &
+	                    i_valpoint=GRID_ucomp)
+	  CALL grid_putinfo(p_ghand(i_timeplus), i_size, r_nodevalues=r_alpha(2,:), &
+	                    i_valpoint=GRID_vcomp)
+	  CALL grid_putinfo(p_ghand(i_timeplus), i_size, r_nodevalues=r_alpha(3,:), &
+	                    i_valpoint=GRID_wcomp)
+
+!-SLM--------- deallocate work arrays
+
+	  deallocate(r_alpha, r_newvl)
+
+	  RETURN
+	  END SUBROUTINE slm_astep
+!*****************************************************************
+	  SUBROUTINE slm_adisplace(p_param, i_arlen, r_coord, r_alpha, r_time)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (control_struct), INTENT(in)                      :: p_param
+	  INTEGER, INTENT(in)                                  :: i_arlen
+	  REAL, DIMENSION(GRID_dimension,i_arlen), INTENT(in)  :: r_coord
+	  REAL, DIMENSION(GRID_dimension,i_arlen), INTENT(out) :: r_alpha
+	  REAL, INTENT(in), OPTIONAL                           :: r_time
+	  REAL, DIMENSION(GRID_dimension)                      :: r_fac, r_caf, &
+	    r_axy, r_xyc
+	  REAL                                                 :: r_dt0, r_dt1, &
+	    r_dt2, r_tim
+	  INTEGER                                              :: i_cnt1, i_cnt2
+          
+!---------- set constants
+
+	  r_dt0= p_param%phy%r_deltatime
+	  r_dt1= 0.5* p_param%phy%r_deltatime
+	  r_dt2= 1.5* p_param%phy%r_deltatime
+	  r_fac= 0.5
+	  r_caf= 2.0
+	  IF(present(r_time)) THEN
+	    r_tim= r_time
+	  ELSE
+	    r_tim= 0.0
+	  END IF
+
+!---------- calculate in an iteration process the displacements
+
+	  unknown_loop: DO i_cnt1=1,i_arlen
+	    r_axy= 0.0
+
+	    iter_loop: DO i_cnt2=1, p_param%phy%i_adviterations
+	      r_xyc= r_coord(:,i_cnt1)- r_fac* r_axy
+	      r_axy= r_dt0* slm_windfield(r_xyc, r_time=r_tim)
+	    END DO iter_loop
+
+	    r_alpha(:,i_cnt1)= r_axy
+	  END DO unknown_loop
+
+	  RETURN
+	  END SUBROUTINE slm_adisplace
+
+!*****************************************************************
+	  SUBROUTINE slm_aupdate(p_param, i_arlen, r_coord, r_rside, r_udate, r_time)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (control_struct), INTENT(in)                   :: p_param
+	  INTEGER, INTENT(in)                                 :: i_arlen
+	  REAL, DIMENSION(GRID_dimension,i_arlen), INTENT(in) :: r_coord
+	  REAL, DIMENSION(i_arlen), INTENT(in)                :: r_rside
+	  REAL, DIMENSION(i_arlen), INTENT(out)               :: r_udate
+	  REAL, INTENT(in), OPTIONAL                          :: r_time
+	  INTEGER                                             :: i_cnt
+	  REAL                                                :: r_dt, r_tim
+
+!---------- in the linear advection case and with f90 this is just
+
+!	  r_udate= r_rside
+
+!---------- including a non-zero right hand side, we have
+
+	  r_dt= p_param%phy%r_deltatime
+	  IF(present(r_time)) THEN
+	    r_tim= r_time
+	  ELSE
+	    r_tim= 0.0
+	  END IF
+
+	  main_loop: DO i_cnt=1, i_arlen
+	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(r_coord(:,i_cnt))
+	  END DO main_loop
+
+	  RETURN
+	  END SUBROUTINE slm_aupdate
+
+!*****************************************************************
+	  SUBROUTINE slm_aupstream(p_mesh, i_arlen, r_coord, &
+	                          r_alpha, r_rside)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), DIMENSION(GRID_timesteps)       :: p_mesh
+	  INTEGER, INTENT(in)                                 :: i_arlen
+	  REAL, DIMENSION(GRID_dimension,i_arlen), INTENT(in) :: r_coord
+	  REAL, DIMENSION(GRID_dimension,i_arlen), INTENT(in) :: r_alpha
+	  REAL, DIMENSION(i_arlen), INTENT(out)               :: r_rside
+	  REAL, DIMENSION(GRID_dimension)                     :: r_fac
+
+!---------- set factor (at which point of trajectory shall i interpolate)
+
+	  r_fac= 1.0
+
+!---------- in the linear advection case this is just interpolation
+
+	  CALL slm_ainterpolate(p_mesh, r_fac, i_arlen, r_coord, &
+	                       r_alpha, r_rside)
+
+	  RETURN
+	  END SUBROUTINE slm_aupstream
+
+!*****************************************************************
+	  SUBROUTINE slm_ainterpolate(p_mesh, r_fac, i_arlen, &
+	                             r_coord, r_alpha, r_rside)
+
+!---------- local declarations
+
+	IMPLICIT NONE
+
+	TYPE (grid_handle), DIMENSION(GRID_timesteps), INTENT(in) :: p_mesh
+	REAL, DIMENSION(GRID_dimension), INTENT(in)         	:: r_fac
+	INTEGER, INTENT(in)                                 	:: i_arlen
+	REAL, DIMENSION(GRID_dimension,i_arlen), INTENT(in) 	:: r_coord
+	REAL, DIMENSION(GRID_dimension,i_arlen), INTENT(in) 	:: r_alpha
+	REAL, DIMENSION(i_arlen), INTENT(out)               	:: r_rside
+     
+      
+	REAL, DIMENSION(GRID_dimension, GRID_elementnodes) 	:: r_en_coor
+	REAL, DIMENSION(:,:), ALLOCATABLE           		:: r_tn_coor_old
+	REAL, DIMENSION(GRID_dimension)             		:: r_ref 
+      
+	REAL, DIMENSION(:,:), ALLOCATABLE              		:: r_upstr
+	REAL, DIMENSION(:), ALLOCATABLE             		:: r_tvol_up
+      
+	REAL, DIMENSION(:), ALLOCATABLE             		:: r_totalvol
+          
+	REAL, DIMENSION(i_arlen)                    		:: r_nmass, r_nvol
+
+	REAL, DIMENSION(GRID_tetranodes)            		:: r_mass_tmp
+	REAL, DIMENSION(GRID_dimension, GRID_tetranodes)  	:: r_tn_coor				! tetranodes coordinates
+	
+	!------- vars. for a priori determination of inner refinement level
+	REAL							:: r_beta				! see info below
+	REAL							:: r_tmass				! current tetra mass
+	REAL, DIMENSION(:), ALLOCATABLE				:: r_tconc				! tetra concentration array
+	REAL							:: r_tconc_max, r_tconc_min		! extrema of concentration in tetra
+	REAL							:: r_relconc, r_relreflvl		! relative conc w.r.t. extrema (0..1)				
+
+	!------- control mass conservation
+	REAL                            			:: r_mass_before, r_mass_inside, r_mass_outside
+
+	!------- control inner adaptivity
+	INTEGER				 			:: MAX_LOOPS
+	REAL				    			:: r_gamma, r_eps
+	REAL, DIMENSION(:), ALLOCATABLE				:: r_volratio
+	REAL							:: r_volratio_max, r_volratio_min, r_volratio_mean
+      
+	INTEGER				 			:: i_loopnum
+
+	
+	INTEGER, DIMENSION(:), ALLOCATABLE		  	:: i_mps_in_tetra
+	INTEGER				 			:: i_mpInTetr
+	INTEGER				 			:: i_MPidx
+	INTEGER				 			:: i_tindex
+!	INTEGER, DIMENSION(:), ALLOCATABLE		  	:: i_prevtidx
+	INTEGER, DIMENSION(:,:), ALLOCATABLE			:: i_enodes 
+	INTEGER, DIMENSION(:,:), ALLOCATABLE			:: i_telmts   
+	INTEGER, DIMENSION(:,:), ALLOCATABLE			:: i_tnodes, i_tnodes_old
+	INTEGER, DIMENSION(:,:), ALLOCATABLE			:: i_tneighbours
+	INTEGER, DIMENSION(:), ALLOCATABLE		  	:: i_tlevel	 	! level of refinement for each tetra
+	INTEGER, DIMENSION(:), ALLOCATABLE			:: i_maxlvl
+	INTEGER				 			:: i_alct, i_siz
+	INTEGER							:: i_tnum_f, i_tnum_f_old, i_enum,  i_nnum, i_nnum_old, i_MPnum, i_tnum_mass
+	INTEGER				 			:: i_srch_cnt, i_elmt_cnt, i_node_cnt, j_cnt, i_tetra_cnt, i_MP_cnt, i_cnt, i_dim
+	INTEGER				 			:: i_tim, i_timplus
+	INTEGER				 			:: i_massassigned, i_voloverload, i_savedMP, i_totalMP
+	
+	INTEGER							:: i_reflvl_startincr, i_reflvl_incr, i_clvlbnd, i_rlvlbnd
+	
+	
+
+	TYPE (MP_entry_ptr), DIMENSION(:), ALLOCATABLE   	:: p_MPtable		! Mass point table
+	TYPE (MP_entry_ptr), DIMENSION(:), ALLOCATABLE   	:: p_MPtable_tmp	! temp. mass point table, for initialization and reallocation purposes
+	TYPE (MP_entry), POINTER		    		:: p_MP			! temp. single mass point entry
+	
+	TYPE (conservation_entry_ptr), DIMENSION(:), ALLOCATABLE  :: p_ttable_tmp	! temp. tetra table, for initialization and reallocation purposes
+	TYPE (conservation_entry), POINTER		 	:: p_ce			! temp. single conservation entry 
+	INTEGER, POINTER					:: i_MPidx_tmp(:)	! temp. mass point index array to reallocate mass points per tetra dynamically
+!-----------	
+	
+	
+	
+!----------- initialize
+	i_tnum_f		= p_mesh(i_timeplus)%i_tnumfine
+	i_tnum_f_old  		= p_mesh(i_time)%i_tnumfine
+	i_enum	  		= p_mesh(i_timeplus)%i_enumber
+	i_nnum_old		= p_mesh(i_time)%i_nnumber
+	i_nnum			= p_mesh(i_timeplus)%i_nnumber     
+	i_tim     		= p_mesh(i_time)%i_timetag
+	i_timplus 		= p_mesh(i_timeplus)%i_timetag
+	i_clvlbnd		= p_mesh(i_tim)%i_crslvlbnd	! coarsest refinement level
+	i_rlvlbnd		= p_mesh(i_tim)%i_reflvlbnd	! finest refinement level
+
+
+!----------- a priori refinement control
+   	r_beta			= 0.5   	! this controls how much the concentration is weighted against the reflvl of the tetras for 
+						! the a priori choice of refinement level
+
+!----------- a posteriori controls for inner adaptivity
+	MAX_LOOPS 		= 1		! set maximum inner iterations
+	i_reflvl_startincr	= 5		! starting increment for inner refinement
+	i_reflvl_incr 		= 3 		! increment for inner refinement
+
+	r_gamma 		= 1.1
+!----------- r_gamma controls the mass assignment
+!----------- if the total volume of all tetras which, via the barycenter, assigned mass to a tetra in the new mesh is greater than r_gamma*vol(tetra), 
+!----------- the old mesh is coarse (w.r.t. volume) to be downstreamed without refining locally. Danger of mass concentration!	
+						
+	r_eps			= 1.e-5		! epsilon greather than zero...
+!-----------	
+
+  
+!---------- allocate work array
+!-------------- 'old mesh' arrays
+	
+	ALLOCATE(i_tlevel(i_tnum_f_old), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+
+	ALLOCATE(i_maxlvl(i_tnum_f_old), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	    
+	ALLOCATE(i_tnodes_old(GRID_tetranodes,i_tnum_f_old), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+	ALLOCATE(r_tn_coor_old(GRID_dimension, i_nnum_old), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+	ALLOCATE(r_tconc(i_tnum_f_old), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+
+!-------------- 'new mesh' arrays     
+	
+	ALLOCATE(r_upstr(GRID_dimension, i_nnum), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+     
+	ALLOCATE(r_tvol_up(i_tnum_f), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+	ALLOCATE(r_totalvol(i_tnum_f), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+	ALLOCATE(r_volratio(i_tnum_f), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+	ALLOCATE(i_mps_in_tetra(i_tnum_f), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)    
+	
+	ALLOCATE(i_enodes(GRID_elementnodes,i_enum), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+	ALLOCATE(i_tnodes(GRID_tetranodes,i_tnum_f), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+	ALLOCATE(i_telmts(GRID_tetraelements,i_tnum_f), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+	ALLOCATE(i_tneighbours(2, i_enum), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+	
+!	ALLOCATE(i_prevtidx(i_tnum_f), stat=i_alct)   !array to prevent circling while searching for tetra
+!	IF(i_alct /= 0) CALL grid_error(60)
+
+!----------
+
+	
+!---------- preinitialize
+	
+	i_tlevel= 0.
+	i_tnodes_old= 0
+	r_tn_coor_old= 0.
+	r_tconc=0.
+	
+	r_upstr= 0.
+	r_tvol_up= 0.
+	r_totalvol= 0.
+	i_mps_in_tetra= 0
+	i_enodes= 0
+	i_tnodes= 0
+	i_telmts= 0
+	i_tneighbours= 0
+!	i_prevtidx= 0
+	
+	r_nmass= 0.
+	r_nvol= 0.
+	r_rside= 0.
+	
+!----------
+	
+
+!---------- initialize Tetra table	
+!---------- ATTENTION> values of i_timeplus and i_time are alternating after each timestep. thus i_timeplus(new_timestep) == i_time(old_timestep) etc.
+!---------- Did the length of the conservation table grow due to more nodes/tetrahedra in the new mesh? Then re-initialize the conservation table
+	
+	IF (.NOT. ALLOCATED(p_ttable)) THEN
+	  CALL slm_interpolinit(p_mesh)
+	END IF
+	
+	IF (size(p_ttable(i_timplus,:)) < i_tnum_f) THEN
+	  ALLOCATE(p_ttable_tmp(i_tnum_f_old), stat=i_alct)
+	  IF(i_alct /= 0) CALL grid_error(60)
+	  
+	  DO i_cnt=1, i_tnum_f_old
+	    p_ttable_tmp(i_cnt)%cp => p_ttable(i_tim, i_cnt)%cp
+	    DEALLOCATE(p_ttable(i_timplus, i_cnt)%cp)
+	  END DO
+	  
+	  DO i_cnt= i_tnum_f_old+1, size(p_ttable(i_tim,:))
+	    DEALLOCATE(p_ttable(i_tim, i_cnt)%cp)
+	    DEALLOCATE(p_ttable(i_timplus, i_cnt)%cp)
+	  END DO
+	  		
+	  DEALLOCATE(p_ttable)
+	  
+	  ALLOCATE(p_ttable(GRID_timesteps, i_tnum_f), stat=i_alct)    
+	  IF(i_alct /= 0) CALL grid_error(60)
+			 
+	  DO i_cnt=1, i_tnum_f_old
+	    p_ttable(i_tim, i_cnt)%cp => p_ttable_tmp(i_cnt)%cp
+	  END DO
+	  
+	  DEALLOCATE(p_ttable_tmp)
+	  
+	  DO i_cnt=i_tnum_f_old+1, i_tnum_f
+	    ALLOCATE(p_ce, stat=i_alct)
+	    IF (i_alct /= 0) CALL grid_error(60)
+	    p_ce%i_MPperTetra     	= 4
+	    p_ce%i_refinelvl		= 1
+	    p_ce%r_value		= 0.
+	    p_ce%r_volume     		= 0.
+	    p_ce%l_valueassigned  	= .FALSE.
+	    p_ce%l_searchtetra    	= .FALSE.
+	    p_ce%l_refine     		= .FALSE.
+	    p_ttable(i_tim, i_cnt)%cp 	=> p_ce
+	  END DO
+	  
+	  DO i_cnt=1, i_tnum_f
+	    ALLOCATE(p_ce, stat=i_alct)
+	    IF (i_alct /= 0) CALL grid_error(60)   
+	    p_ce%i_MPperTetra     	= 4
+	    p_ce%i_refinelvl		= 1
+	    p_ce%r_value		= 0.
+	    p_ce%r_volume     		= 0.
+	    p_ce%l_valueassigned 	= .FALSE.
+	    p_ce%l_searchtetra    	= .FALSE.
+	    p_ce%l_refine     		= .FALSE.
+	    p_ttable(i_timplus, i_cnt)%cp => p_ce
+	  END DO
+	  
+	ELSE ! no array size adjustment necessary, reset i_timplus array to zero
+
+	  DO i_cnt=1, i_tnum_f
+	    p_ttable(i_timplus, i_cnt)%cp%i_MPperTetra    	= 4
+	    p_ttable(i_timplus, i_cnt)%cp%i_refinelvl     	= 1
+	    p_ttable(i_timplus, i_cnt)%cp%r_value	   	= 0.
+	    p_ttable(i_timplus, i_cnt)%cp%r_volume	  	= 0.	    
+	    p_ttable(i_timplus, i_cnt)%cp%l_valueassigned 	= .FALSE.
+	    p_ttable(i_timplus, i_cnt)%cp%l_searchtetra   	= .FALSE.
+	    p_ttable(i_timplus, i_cnt)%cp%l_refine	  	= .FALSE.   
+	  END DO  
+		     
+	END IF
+	
+!----------	   
+
+
+!---------- calculate upstream coordinates of the new mesh
+
+	dim_loop: DO i_cnt=1, GRID_dimension
+	  r_upstr(i_cnt,:) = r_coord(i_cnt,:)- r_fac(i_cnt)* r_alpha(i_cnt,:)
+	END DO dim_loop
+	
+!----------   
+
+
+!---------- collect necessary infos of the new mesh to assign the later generated mass points to the tetrahedra in the new mesh
+
+	CALL grid_getinfo(p_mesh(i_timeplus), i_tnum_f, i_tetranodes= i_tnodes, l_finelevel=.TRUE., l_relative=.TRUE.)
+	CALL grid_getinfo(p_mesh(i_timeplus), i_tnum_f, i_tetraelmts= i_telmts, l_finelevel=.TRUE., l_relative=.TRUE.)
+	CALL grid_getinfo(p_mesh(i_timeplus), i_enum, i_elementnodes= i_enodes, l_finelevel=.FALSE., l_relative=.TRUE.)
+	CALL grid_getinfo(p_mesh(i_timeplus), i_enum, i_adjacencies= i_tneighbours, l_finelevel=.TRUE., l_relative=.TRUE.)
+	
+!----------
+
+
+!----------- calculate volume of upstreamed tetras to control assignment of mass to the new mesh later	
+
+	DO i_cnt= 1, i_tnum_f
+	  r_tvol_up(i_cnt) = calc_vol(r_upstr(:, i_tnodes(1, i_cnt)), r_upstr(:, i_tnodes(2, i_cnt)),&
+					 r_upstr(:, i_tnodes(3, i_cnt)), r_upstr(:, i_tnodes(4, i_cnt)))
+	END DO 
+	
+!----------
+
+
+!---------- collect necessary infos of the old mesh to generate mass points
+
+	CALL grid_getinfo(p_mesh(i_time), i_nnum_old, r_nodecoordinates = r_tn_coor_old)
+	CALL grid_getinfo(p_mesh(i_time), i_tnum_f_old, i_tetranodes= i_tnodes_old, l_finelevel=.TRUE., l_relative=.TRUE.)
+	CALL grid_getinfo(p_mesh(i_time), i_tnum_f_old, i_tetralevel= i_tlevel, l_finelevel=.TRUE.)
+	
+!----------
+
+
+!---------- determine concentration max/min to compute refinement level of tetra later 
+!---------- (only non zero min/max since there are only mass points for tetras with nonzero mass)
+
+	r_tconc_max = 0.
+	
+	!------ fill tetra concentration table
+	DO i_tetra_cnt= 1, i_tnum_f_old
+	  r_tmass = SUM(p_ttable(i_tim, i_tetra_cnt)%cp%r_value)
+	  IF (r_tmass > 0.) THEN
+	    r_tconc(i_tetra_cnt) = r_tmass / p_ttable(i_tim, i_tetra_cnt)%cp%r_volume	! r_volume > 0 for all tetra  
+	    r_tconc_min = r_tconc(i_tetra_cnt)	!choose any non-zero start for minimum search
+	  ELSE
+	    r_tconc(i_tetra_cnt) = 0.
+	  END IF
+	END DO
+        
+	!------ get the max/min
+	DO i_cnt=1,i_tnum_f_old
+	  IF (r_tconc(i_cnt) > 0.) THEN
+	    IF (r_tconc(i_cnt) < r_tconc_min) THEN
+	      r_tconc_min = r_tconc(i_cnt)
+	    END IF
+	    IF (r_tconc(i_cnt) > r_tconc_max) THEN
+	      r_tconc_max = r_tconc(i_cnt)
+	    END IF
+	  END IF
+	END DO 
+	
+!----------       
+
+
+!---------- initialize all tetras with mass to be searched (a priori refinement level determination)
+
+	i_tnum_mass = 0  
+	
+	DO i_tetra_cnt= 1, i_tnum_f_old
+	  IF (p_ttable(i_tim, i_tetra_cnt)%cp%l_valueassigned) THEN
+	    i_tnum_mass = i_tnum_mass + 1
+	    p_ttable(i_tim, i_tetra_cnt)%cp%l_searchtetra = .TRUE.
+
+	    r_relconc 	= (r_tconc(i_tetra_cnt) - r_tconc_min + r_eps) / &		! beware of zero-valued terms --> r_eps
+			  (r_tconc_max - r_tconc_min + r_eps)
+	    r_relreflvl	= (REAL(i_tlevel(i_tetra_cnt) - i_clvlbnd) + r_eps) / &		
+			  (REAL(i_rlvlbnd - i_clvlbnd) + r_eps)
+	       
+            p_ttable(i_tim, i_tetra_cnt)%cp%i_refinelvl = CEILING(r_relconc * r_relreflvl * REAL(MAX_REFLVL - i_reflvl_incr))
+
+!	    IF (p_ttable(i_tim, i_tetra_cnt)%cp%i_refinelvl > MAX_REFLVL) THEN
+!             p_ttable(i_tim, i_tetra_cnt)%cp%i_refinelvl = MAX_REFLVL
+!	    ELSE
+	      IF (p_ttable(i_tim, i_tetra_cnt)%cp%i_refinelvl < 4) THEN
+	        p_ttable(i_tim, i_tetra_cnt)%cp%i_refinelvl = 4
+              END IF
+!	    END IF  
+
+	    p_ttable(i_tim, i_tetra_cnt)%cp%i_MPperTetra = p_MPCtable(p_ttable(i_tim, i_tetra_cnt)%cp%i_refinelvl)%i_cnum	    
+	  ELSE 
+	    p_ttable(i_tim, i_tetra_cnt)%cp%l_searchtetra = .FALSE.
+	    p_ttable(i_tim, i_tetra_cnt)%cp%i_refinelvl  = 1
+	    p_ttable(i_tim, i_tetra_cnt)%cp%i_MPperTetra = 4
+	  END IF
+	  
+	  ALLOCATE(i_MPidx_tmp(p_ttable(i_tim, i_tetra_cnt)%cp%i_MPperTetra), stat=i_alct)
+	  IF (i_alct /= 0) CALL grid_error(60)	  
+	  i_MPidx_tmp = 0
+	  p_ttable(i_tim,i_tetra_cnt)%cp%i_MPindex => i_MPidx_tmp
+	  NULLIFY(i_MPidx_tmp)
+	  	  
+	END DO
+	
+!-----------
+
+
+!----------- initialize Mass Point table
+
+	i_MPnum = 0
+	
+	!------ determine total number of Mass points
+	DO i_tetra_cnt= 1, i_tnum_f_old
+	  IF (p_ttable(i_tim, i_tetra_cnt)%cp%l_valueassigned) THEN
+	    i_MPnum = i_MPnum + p_ttable(i_tim, i_tetra_cnt)%cp%i_MPperTetra
+	  END IF
+	END DO
+	!------
+     	
+	!------ Allocate and initialize new mass point table
+	ALLOCATE(p_MPtable(i_MPnum), stat=i_alct)
+	IF (i_alct /= 0) CALL grid_error(60)
+    
+	DO i_cnt = 1, i_MPnum
+	  ALLOCATE(p_MP, stat=i_alct)
+	  IF (i_alct/=0) CALL grid_error(60)
+	  p_MP%i_MPinTetra = 0
+	  p_MP%i_MPbyTetra = 0
+	  p_MP%r_mass = 0.
+	  p_MP%r_volume = 0.
+	  p_MP%r_coord = 0.
+	  p_MP%l_searchMP = .FALSE.
+	  p_MP%l_assignvalue = .FALSE.
+	  p_MPtable(i_cnt)%MP => p_MP
+	  NULLIFY(p_MP)
+	END DO
+	!------
+	
+!----------
+         
+
+!---------- start iterating loop here--------------------
+
+	i_loopnum = 0
+	i_savedMP = 0
+	i_totalMP = 0
+	
+	iterating_loop:DO 
+	  i_loopnum = i_loopnum + 1
+    
+  	!------ create mass point table from tetra table      
+      	  
+	  !------ determine total number of Mass points
+	  i_MPnum = 0
+	  
+	  DO i_tetra_cnt= 1, i_tnum_f_old
+	    IF (p_ttable(i_tim, i_tetra_cnt)%cp%l_valueassigned) THEN
+	      i_MPnum = i_MPnum + p_ttable(i_tim, i_tetra_cnt)%cp%i_MPperTetra
+	    END IF
+	  END DO
+       	  !------		
+		
+	  !------ Create new mass points which still have to be searched (save old already found ones, if existent)
+	  !------ temporary array is not nice, but necessary here, no dynamic memory allocation on p_MPtable in other module possible	  
+	  ALLOCATE(p_MPtable_tmp(i_MPnum), stat=i_alct)
+	  IF (i_alct /= 0) CALL grid_error(60)
+          
+	  CALL createMPs(p_MPtable,p_MPtable_tmp,i_MPnum, i_tim, r_tn_coor_old, i_nnum, i_tnodes_old, i_tnum_f_old)
+            
+	  i_siz = size(p_MPtable)
+	  DO i_cnt=1,i_siz
+	    DEALLOCATE(p_MPtable(i_cnt)%MP)
+	  END DO      
+	  DEALLOCATE(p_MPtable)    
+	  ALLOCATE(p_MPtable(i_MPnum), stat=i_alct)
+	  IF (i_alct/=0) CALL grid_error(60)
+        
+	  DO i_cnt = 1, i_MPnum
+	    p_MPtable(i_cnt)%MP => p_MPtable_tmp(i_cnt)%MP
+	  END DO
+      
+	  i_siz = size(p_MPtable_tmp)
+	  DO i_cnt = i_MPnum+1, i_siz
+	    DEALLOCATE(p_MPtable_tmp(i_cnt)%MP)
+	  END DO     
+	  DEALLOCATE(p_MPtable_tmp)
+	  !------
+	  
+	!------
+
+	  
+	!------ Now we have the coordinates and the mass of the mass points. Lets look, in which 'new mesh' tetra they lie	  
+	!------ find tetrahedron of the upstreamed mesh in which each mass point lies
+ 
+	  masspoint_loop: DO i_cnt=1, i_MPnum
+	  
+	    IF (p_MPtable(i_cnt)%MP%l_searchMP) THEN	! if the position of MP is already known, why search for a tetra again?
+	      i_totalMP = i_totalMP + 1 
+	      CALL searchMP(p_MPtable, i_MPnum, i_cnt, i_tnum_f, i_enum, &		! this subroutine is very time consuming!
+			  i_nnum, i_enodes, i_tnodes, i_telmts, i_tneighbours, r_upstr)  	
+	    END IF
+	     
+	  END DO masspoint_loop
+	  
+	!------
+
+	
+	!------------ What about barycenters lying outside the mesh? masses will NOT be assigned to any nodes
+
+
+	!------ generate volume stats: How much volume does the tetras of the new get of the old mesh; for a posteriori adaption control mechanism
+	
+      	  r_totalvol(:) 	= 0.
+	  i_mps_in_tetra(:)  	= 0
+	  
+	  DO i_cnt=1, i_MPnum
+	    IF (p_MPtable(i_cnt)%MP%l_assignvalue) THEN
+	      i_mpInTetr = p_MPtable(i_cnt)%MP%i_MPinTetra
+	      r_totalvol(i_mpInTetr) = r_totalvol(i_mpInTetr) + p_MPtable(i_cnt)%MP%r_volume
+	      i_mps_in_tetra(i_mpInTetr) = i_mps_in_tetra(i_mpInTetr) + 1
+	    END IF
+	  END DO
+	  
+	!-------
+	
+
+	!------ generate stats how many tetras in the new mesh will get mass assigned
+	
+	  i_massassigned = 0
+	  
+	  DO i_cnt=1,i_tnum_f
+	    IF (i_mps_in_tetra(i_cnt) > 0) THEN
+	      i_massassigned = i_massassigned +1
+	    END IF
+	  END DO
+	  
+	  IF (i_massassigned == 0) THEN
+	    CALL grid_error(c_error='[SLM_interpolation] No mass to assign.')
+	  END IF
+	  
+	!------
+	
+	
+	!------- calculate ratio of assigned volume w.r.t. upstream volume of tetra; get min, max and mean value
+	  
+	  r_volratio_max 	= 1.0
+	  r_volratio_min 	= 1.0
+	  r_volratio_mean	= 1.0
+	  j_cnt			= 0
+	  
+	  DO i_cnt=1, i_tnum_f
+	    IF (r_totalvol(i_cnt) > 0. .AND. r_tvol_up(i_cnt) > 0.) THEN
+	      r_volratio(i_cnt) = r_totalvol(i_cnt) / r_tvol_up(i_cnt)
+	      IF (r_volratio(i_cnt) > r_volratio_max) THEN
+		r_volratio_max = r_volratio(i_cnt)
+	      END IF
+	      IF (r_volratio(i_cnt) < r_volratio_min) THEN   
+	        r_volratio_min = r_volratio(i_cnt)
+	      END IF
+	      j_cnt = j_cnt +1
+	      r_volratio_mean = r_volratio_mean + r_volratio(i_cnt)
+	    END IF
+	  END DO
+	  
+	  r_volratio_mean = r_volratio_mean / REAL(j_cnt)		!without zero-valued tetras
+
+	!-------
+	
+	
+	!------- check the volume condition and refine in case of "volume overload"
+	
+	  i_voloverload = 0
+	  
+	  mp_loop: DO i_cnt=1, i_MPnum
+	    i_mpInTetr = p_MPtable(i_cnt)%MP%i_MPinTetra
+	    
+	    !------ 
+	    IF ((.NOT. p_MPtable(i_cnt)%MP%l_assignvalue) .OR. &
+	  	(i_MPinTetr == 0) 			  .OR. &
+            	(p_MPtable(i_cnt)%MP%r_mass == 0.)) 	  THEN
+		
+              CYCLE mp_loop
+            END IF
+	    !------
+        
+            !------ if the total volume of mass points landed in the upstreamed tetra is greater than r_gamma*volume(upstreamed tetra), refine!       
+            IF (r_gamma < r_volratio(i_MPinTetr)) THEN
+               
+              !------ dont assign mass of this tetra to the nodes of the new mesh; refine first         
+              p_ttable(i_tim, p_MPtable(i_cnt)%MP%i_MPbyTetra)%cp%l_refine = .TRUE.         
+
+              !------ for the stats: note the number of tetra in new mesh with too much volume assigned
+              IF (i_mps_in_tetra(i_MPinTetr) > 0) THEN
+		i_voloverload = i_voloverload + 1
+		i_mps_in_tetra(i_MPinTetr) = 0
+	      END IF
+         
+	    END IF
+	    !------
+	         
+	  END DO mp_loop
+	  
+	!----------
+	
+     	!---------- leave refinement loop if MAX_LOOPS is arrived   ! or no volume overload is determined
+	
+	  IF ((i_loopnum == MAX_LOOPS) ) THEN	!.OR. (i_voloverload == 0)
+	    EXIT
+	  ELSE    
+            !------ rise refinement_lvl and mark tetras for re-search 
+	    DO i_cnt= 1, i_tnum_f_old
+	    
+	      IF ((p_ttable(i_tim, i_cnt)%cp%l_refine) .AND. (p_ttable(i_tim, i_cnt)%cp%i_refinelvl < MAX_REFLVL)) THEN
+	      
+	        !------ all MPs by one tetra must be recalculated, reset all MPs of the concerned tetra
+	        DO j_cnt=1, p_ttable(i_tim, i_cnt)%cp%i_MPperTetra
+        	  i_MPidx = p_ttable(i_tim, i_cnt)%cp%i_MPindex(j_cnt)      
+        	  p_MPtable(i_MPidx)%MP%l_assignvalue = .FALSE.
+		END DO
+		!------
+		
+	      	!------ set new inner refinement level of tetra
+		p_ttable(i_tim, i_cnt)%cp%i_refinelvl = p_ttable(i_tim, i_cnt)%cp%i_refinelvl + i_reflvl_incr
+		IF (p_ttable(i_tim, i_cnt)%cp%i_refinelvl > MAX_REFLVL) p_ttable(i_tim, i_cnt)%cp%i_refinelvl = MAX_REFLVL
+		p_ttable(i_tim, i_cnt)%cp%i_MPperTetra = p_MPCtable(p_ttable(i_tim, i_cnt)%cp%i_refinelvl)%i_cnum
+		!------
+		
+	      	!------ prolongue the dynamically administered Mass point index array
+		DEALLOCATE(p_ttable(i_tim, i_cnt)%cp%i_MPindex)
+		ALLOCATE(i_MPidx_tmp(p_ttable(i_tim, i_cnt)%cp%i_MPperTetra), stat=i_alct)
+		IF (i_alct /= 0) CALL grid_error(60)
+		i_MPidx_tmp = 0
+		p_ttable(i_tim, i_cnt)%cp%i_MPindex => i_MPidx_tmp
+		NULLIFY(i_MPidx_tmp)
+		!------
+		
+	      	!------ set logical values for re-search	
+		p_ttable(i_tim, i_cnt)%cp%l_refine = .FALSE.
+		p_ttable(i_tim, i_cnt)%cp%l_searchtetra = .TRUE.
+		!------
+		
+	      ELSE ! tetra not to be refined or already on maximum refinement level	      
+		p_ttable(i_tim, i_cnt)%cp%l_searchtetra = .FALSE.
+	      END IF
+	      
+	    END DO
+	    !------
+	    
+	  END IF
+	  
+	!----------
+
+	
+	END DO iterating_loop  
+	
+!---------- end iterating loop here--------------------   
+
+
+!---------- assign mass of the mass points to the nodes of the tetra in which the mass point landed; save mass and volume for next step
+
+    mass_assignment_mp_loop: DO i_cnt=1, i_MPnum        
+        
+	  IF (.NOT. p_MPtable(i_cnt)%MP%l_assignvalue 	.OR. &
+	      p_MPtable(i_cnt)%MP%i_MPinTetra == 0 	.OR. &
+	      p_MPtable(i_cnt)%MP%r_mass == 0.) THEN
+	    
+	    CYCLE mass_assignment_mp_loop
+	  
+	  END IF
+        
+	  r_mass_tmp = 0
+	  i_mpInTetr = p_MPtable(i_cnt)%MP%i_MPinTetra
+        
+	  DO i_node_cnt=1, GRID_tetranodes
+	    r_tn_coor(:,i_node_cnt) = r_upstr(:,i_tnodes(i_node_cnt, i_mpInTetr))
+	  END DO  
+        
+	  r_mass_tmp = assign_mass(r_tn_coor, p_MPtable(i_cnt)%MP%r_coord, p_MPtable(i_cnt)%MP%r_mass)
+        
+	  r_nmass(i_tnodes(1,i_mpInTetr)) = r_nmass(i_tnodes(1,i_mpInTetr)) + r_mass_tmp(1)
+	  r_nmass(i_tnodes(2,i_mpInTetr)) = r_nmass(i_tnodes(2,i_mpInTetr)) + r_mass_tmp(2)
+	  r_nmass(i_tnodes(3,i_mpInTetr)) = r_nmass(i_tnodes(3,i_mpInTetr)) + r_mass_tmp(3)
+	  r_nmass(i_tnodes(4,i_mpInTetr)) = r_nmass(i_tnodes(4,i_mpInTetr)) + r_mass_tmp(4)
+     
+        
+	  p_ttable(i_timplus,i_mpInTetr)%cp%r_value    =  p_ttable(i_timplus,i_mpInTetr)%cp%r_value + r_mass_tmp
+	  p_ttable(i_timplus,i_mpInTetr)%cp%l_valueassigned = .TRUE.
+	  p_ttable(i_timplus,i_mpInTetr)%cp%l_searchtetra   = .TRUE.
+            
+	END DO mass_assignment_mp_loop
+      
+!----------
+
+     
+!---------- calculate volume of tetras of the new mesh to assign to the mass points 
+   
+	DO i_cnt= 1, i_tnum_f
+	  IF (p_ttable(i_timplus,i_mpInTetr)%cp%l_valueassigned) THEN
+	    p_ttable(i_timplus, i_cnt)%cp%r_volume = &
+	    	calc_vol(r_coord(:, i_tnodes(1, i_cnt)), r_coord(:, i_tnodes(2, i_cnt)), &
+                            r_coord(:, i_tnodes(3, i_cnt)), r_coord(:, i_tnodes(4, i_cnt)))
+          END IF
+        END DO 
+	
+!----------  
+
+  
+!---------- write assignment stats
+
+	write(GRID_parameters%ioout, 1000)
+	write(GRID_parameters%ioout, 1400) i_tnum_f
+	write(GRID_parameters%ioout, 1401) i_massassigned
+	write(GRID_parameters%ioout, 1402) i_voloverload
+	write(GRID_parameters%ioout, 1403) r_volratio_max, r_volratio_min, r_volratio_mean
+	write(GRID_parameters%ioout, 1404) i_totalMP - i_savedMP, i_loopnum
+	
+!----------
+
+
+!---------- generate and write mass statistics
+
+	r_mass_before  = 0.
+	r_mass_outside = 0.
+	r_mass_inside  = 0.
+      
+	DO i_cnt=1, i_tnum_f_old
+	  r_mass_before = r_mass_before + SUM(p_ttable(i_tim, i_cnt)%cp%r_value)      
+	END DO
+      
+	DO i_cnt= 1, i_MPnum
+ 	  IF (p_MPtable(i_cnt)%MP%i_MPinTetra == 0) THEN
+	    r_mass_outside = r_mass_outside + p_MPtable(i_cnt)%MP%r_mass
+	  END IF
+	END DO
+            
+	DO i_cnt=1,i_tnum_f
+	  r_mass_inside = r_mass_inside + SUM(p_ttable(i_timplus, i_cnt)%cp%r_value)
+	END DO
+      
+	write(GRID_parameters%ioout, 1000)
+	write(GRID_parameters%ioout, 1001) r_mass_before 
+	write(GRID_parameters%ioout, 1002) r_mass_inside
+	write(GRID_parameters%ioout, 1003) r_mass_outside
+	write(GRID_parameters%ioout, 1004) r_mass_inside+r_mass_outside
+      
+!----------
+
+
+!---------- calculate the "influenced" volume ( grid_nodevol() ) of each node and, by knowing the summarized mass, the concentration at the upstream node of the mesh
+
+	CALL grid_nodevolume(p_mesh(i_timeplus), i_nnum, r_nvol)    
+	
+	r_rside =  r_nmass / r_nvol
+
+!----------	
+
+
+!---------- generate and write concentration stats
+
+	write(GRID_parameters%ioout, 1000)
+	write(GRID_parameters%ioout, 1300) MAXVAL(r_rside), MINVAL(r_rside)
+	write(GRID_parameters%ioout, 1000)
+      
+!----------
+      
+      
+!---------- this is it! deallocate all temporal variables
+
+	DEALLOCATE(i_tlevel)
+	DEALLOCATE(i_maxlvl)
+	DEALLOCATE(i_tnodes_old)
+	DEALLOCATE(r_tn_coor_old)
+	DEALLOCATE(r_tconc)
+      
+	DEALLOCATE(r_upstr)
+	DEALLOCATE(r_tvol_up)
+	DEALLOCATE(r_totalvol)
+	DEALLOCATE(r_volratio)
+	DEALLOCATE(i_mps_in_tetra)
+	DEALLOCATE(i_enodes)
+	DEALLOCATE(i_tnodes)
+	DEALLOCATE(i_telmts)
+	DEALLOCATE(i_tneighbours)
+!	DEALLOCATE(i_prevtidx)
+      
+      	DO i_cnt=1, i_tnum_f_old
+	  DEALLOCATE(p_ttable(i_tim, i_cnt)%cp%i_MPindex)
+	END DO
+      
+	DO i_cnt=1, i_MPnum
+	  DEALLOCATE(p_MPtable(i_cnt)%MP)
+	END DO
+	DEALLOCATE(p_MPtable)
+      
+!---------     
+      
+
+      RETURN
+      
+      1000	FORMAT(1x,'***** ***** ***** ***** ***** ***** ***** ***** ***** *****')
+      1001	FORMAT(1x,'***** Total mass in last step:',11x,e12.4,' *****')
+      1002	FORMAT(1x,'***** Total mass in new mesh :',11x,e12.4,' *****')
+      1003	FORMAT(1x,'***** Total mass outside new mesh (lost):',e12.4,' *****')
+      1004	FORMAT(1x,'***** Total mass in this step:',11x,e12.4,' *****')
+      
+      1100	FORMAT(1x,'----- Warning, windless field! more than one barycenter in: ',i12,' -----')
+      1200	FORMAT(1x,'----- Warning, mass assignment critical in: ',i12,' -----')
+      1300	FORMAT(1x,'***** Max conc.:',1x,e12.4,' Min conc.:',1x,e12.4,' *****')
+      1400	FORMAT(1x,'***** Total tetra in new mesh:',11x,i12,' *****')
+      1401	FORMAT(1x,'***** --- with mass:',21x,i12,' *****')
+      1402	FORMAT(1x,'***** --- with too much volume assigned:',1x,i12,' *****')
+      1403	FORMAT(1x,'***** Max vol.:',1x,e10.4,' Min vol.:',1x,e10.4,' Mean vol.:',1x,e10.4,' *****')
+      1404	FORMAT(1x,'***** No. of mass points:',1x,i9,' in loops ',i8,' *****')
+      
+      
+      
+	  END SUBROUTINE slm_ainterpolate
+!*****************************************************************
+
+      SUBROUTINE slm_interpolinit(p_mesh)
+
+!---------- local declarations
+
+	IMPLICIT NONE
+
+	TYPE (grid_handle), DIMENSION(GRID_timesteps)       	:: p_mesh
+	
+	REAL, DIMENSION(:,:), ALLOCATABLE               	:: r_tval
+	REAL, DIMENSION(:), ALLOCATABLE             		:: r_tvol
+	REAL, DIMENSION(GRID_tetranodes)            		:: r_nmass_tmp
+        
+	TYPE (conservation_entry), POINTER              	:: p_ce1, p_ce2
+      
+	INTEGER                         			:: i_alct, i_cnt, i_tnode_cnt, i_MP_cnt, i_tetra_cnt
+	INTEGER                         			:: i_tnum_f_old, i_tim, i_timplus
+      
+!---------- preinitialize
+      
+	i_tnum_f_old  = p_mesh(i_time)%i_tnumfine
+	i_tim         = p_mesh(i_time)%i_timetag        
+	i_timplus     = p_mesh(i_timeplus)%i_timetag 
+      
+
+!---------- allocate work array
+!-------------- 'old mesh' arrays
+
+	ALLOCATE(r_tval(GRID_tetranodes,i_tnum_f_old), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+      
+	ALLOCATE(r_tvol(i_tnum_f_old), stat=i_alct)
+	IF(i_alct /= 0) CALL grid_error(60)
+      
+!--------------- allocate the table, which saves the value to be conserved throughout all computation steps
+	ALLOCATE(p_ttable(GRID_timesteps, i_tnum_f_old), stat=i_alct) 
+	IF(i_alct /= 0) CALL grid_error(60)
+
+
+!--------------- preinitialize
+	r_tval    = 0.
+	r_tvol    = 0.
+          
+!---------- initialize conservation table with the values to be conserved 
+	CALL grid_getinfo(p_mesh(i_time), i_tnum_f_old, r_tetravalues = r_tval, l_finelevel=.TRUE., l_relative=.TRUE.)
+	CALL grid_tetvolume(p_mesh(i_time), i_tnum_f_old, r_tvol)
+      
+!---------- initialize coefficient table
+	CALL generate_MP_coeff(p_mesh)
+
+!---------- initialize p_ttable with values where mass is present
+	tetra_loop: DO i_tetra_cnt= 1, i_tnum_f_old       
+	  ALLOCATE (p_ce1, p_ce2, stat=i_alct)        
+	  IF (i_alct /= 0) CALL grid_error(60)
+        
+	  IF(r_tval(1,i_tetra_cnt)/=0. .OR. r_tval(2,i_tetra_cnt)/=0. .OR. &
+             r_tval(3,i_tetra_cnt)/=0. .OR. r_tval(4,i_tetra_cnt)/=0.) THEN
+          !---- create new tetra entry with mass
+	    p_ce1%i_MPperTetra		= 4
+	    p_ce1%l_valueassigned	= .TRUE.
+	    p_ce1%l_searchtetra		= .TRUE.
+	    p_ce1%l_refine		= .FALSE.
+	    p_ce1%i_refinelvl		= 1
+	    p_ce1%r_volume		= r_tvol(i_tetra_cnt)
+	    DO i_tnode_cnt= 1, GRID_tetranodes
+	      p_ce1%r_value(i_tnode_cnt) = r_tval(i_tnode_cnt, i_tetra_cnt) * 0.25*p_ce1%r_volume
+	    END DO
+	    p_ttable(i_tim, i_tetra_cnt)%cp => p_ce1
+	    NULLIFY(p_ce1)
+	  ELSE
+	    p_ce1%i_MPperTetra		= 4
+	    p_ce1%l_valueassigned	= .FALSE.
+	    p_ce1%l_searchtetra		= .FALSE.
+	    p_ce1%l_refine		= .FALSE.
+	    p_ce1%i_refinelvl		= 1
+	    p_ce1%r_volume		= 0.
+	    p_ce1%r_value		= 0. 
+	    p_ttable(i_tim, i_tetra_cnt)%cp => p_ce1
+	    NULLIFY(p_ce1)
+	  END IF
+	  
+	  p_ce2%i_MPperTetra		= 4
+	  p_ce2%l_valueassigned		= .FALSE.
+	  p_ce2%l_searchtetra		= .FALSE.
+	  p_ce2%l_refine		= .FALSE.
+	  p_ce2%i_refinelvl		= 1
+	  p_ce2%r_volume		= 0.
+	  p_ce2%r_value			= 0.
+	  p_ttable(i_timplus, i_tetra_cnt)%cp => p_ce2
+	  NULLIFY(p_ce2)                 
+	END DO tetra_loop
+
+!--------- deallocation      
+      
+	DEALLOCATE(r_tval)
+	DEALLOCATE(r_tvol)   
+      
+	RETURN
+	
+      END SUBROUTINE slm_interpolinit
+      
+!*****************************************************************
+
+      SUBROUTINE slm_interpolquit
+      
+!---------- local declarations
+
+	IMPLICIT NONE
+      
+	INTEGER				:: i_cnt, i_siz
+      
+      
+	CALL remove_MP_coeff
+      
+	i_siz = size(p_ttable(1,:))
+	DO i_cnt= 1, i_siz
+	  DEALLOCATE(p_ttable(1,i_cnt)%cp)
+	  DEALLOCATE(p_ttable(2,i_cnt)%cp)
+	END DO
+      
+
+	DEALLOCATE(p_ttable)
+
+	RETURN
+	
+      END SUBROUTINE slm_interpolquit
+      
+!*****************************************************************
+
+      SUBROUTINE searchMP(p_MPtable, i_MPnum, i_MPcnt, i_tnum_f, i_enum, &
+      			  i_nnum, i_enodes, i_tnodes, i_telmts, i_tneighbours, r_upstr)
+      
+!---------- local declarations
+
+	IMPLICIT NONE
+      
+	TYPE (MP_entry_ptr), DIMENSION(i_MPnum)   		:: p_MPtable
+	INTEGER							:: i_MPnum
+	INTEGER							:: i_MPcnt
+      
+!	INTEGER, DIMENSION(i_tnum_f)				:: i_prevtidx
+      
+	INTEGER, DIMENSION(GRID_elementnodes, i_enum)		:: i_enodes
+	INTEGER, DIMENSION(GRID_tetranodes, i_tnum_f)		:: i_tnodes
+	INTEGER, DIMENSION(GRID_tetraelements, i_tnum_f)	:: i_telmts
+	INTEGER, DIMENSION(2, i_enum)				:: i_tneighbours
+	REAL, DIMENSION(GRID_dimension, i_nnum)			:: r_upstr
+      
+      
+      
+	INTEGER							:: i_tnum_f, i_tnum_f_old, i_enum, i_nnum
+	INTEGER							:: i_cnt, j_cnt, i_srch_cnt, i_node_cnt, i_elmt_cnt
+      
+	INTEGER							:: i_tindex
+	INTEGER							:: i_enode_loc, i_tnode_loc, i_telmt_loc
+      
+	REAL, DIMENSION(GRID_dimension)				:: r_ref
+	REAL, DIMENSION(GRID_dimension, GRID_elementnodes)	:: r_en_coor
+      
+	LOGICAL							:: l_tfound, l_sameside, l_circled
+      
+
+
+   
+!	i_srch_cnt = 1
+!        i_prevtidx = 0
+        
+	!------ set starting tetra
+	IF (p_MPtable(i_MPcnt)%MP%i_MPbyTetra < i_tnum_f) THEN
+          i_tindex = p_MPtable(i_MPcnt)%MP%i_MPbyTetra            
+!          i_prevtidx(i_srch_cnt) = i_tindex
+        ELSE
+          i_tindex = i_tnum_f
+!          i_prevtidx(i_srch_cnt) = i_tindex
+        END IF
+        !------
+                
+        !------ in which tetra of the new upstreamed mesh does the mass point of the old mesh lie?
+        search_loop: DO 
+!          i_srch_cnt = i_srch_cnt + 1
+          l_tfound = .TRUE.
+	  
+          !------ check whether mass point is in tetra
+          elmt_loop: DO i_elmt_cnt=1, GRID_tetraelements
+	    i_telmt_loc = i_telmts(i_elmt_cnt,i_tindex)
+        
+	    !------ get the upstream coords for the three face nodes
+	    node_loop: DO i_node_cnt=1, GRID_elementnodes
+	      i_enode_loc = i_enodes(i_node_cnt,i_telmt_loc)
+              r_en_coor(:,i_node_cnt) = r_upstr(:,i_enode_loc)
+            END DO node_loop
+	    !------
+	    
+            !------ each face (elmts) has three nodes, get the upstrean coordinates of the fourth tetranode (called r_ref)
+            tetranode_loop: DO i_node_cnt=1,GRID_tetranodes
+	      i_tnode_loc = i_tnodes(i_node_cnt,i_tindex)
+              IF (i_enodes(1,i_telmt_loc) /= i_tnode_loc) THEN
+	        IF (i_enodes(2,i_telmt_loc) /= i_tnode_loc) THEN
+        	  IF (i_enodes(3,i_telmt_loc) /= i_tnode_loc) THEN
+        	    r_ref = r_upstr(:,i_tnode_loc)
+        	    EXIT
+		  END IF
+		END IF
+              END IF 
+            END DO tetranode_loop
+	    !------ 
+	    	    
+	    !------ is the mass point on the same side of the face as the reference point?
+            l_sameside= samesid_3d(r_en_coor(:,1), r_en_coor(:,2), r_en_coor(:,3), r_ref, p_MPtable(i_MPcnt)%MP%r_coord)
+
+            !------ if not, mass point is not in the currently observed tetra, get tetra next to the current tetra via face which resulted "point outside"
+            IF (.NOT. l_sameside) THEN
+!              l_circled = .FALSE.
+              IF (i_tneighbours(1, i_telmt_loc)==i_tindex) THEN
+!	       	DO j_cnt=1, i_srch_cnt-1                            !prevent circling
+!	       	  IF (i_tneighbours(2, i_telmt_loc)==i_prevtidx(j_cnt)) THEN
+!                    l_circled = .TRUE.
+!		    EXIT
+!	       	  END IF  
+!	       	END DO    
+!	       	IF (.NOT. l_circled) THEN
+!	       	  i_prevtidx(i_srch_cnt) = i_tindex
+        	  i_tindex= i_tneighbours(2, i_telmt_loc)
+        	  l_tfound = .FALSE. 
+        	  EXIT
+!	       	END IF      
+              ELSE 
+!	       	DO j_cnt= 1,i_srch_cnt-1                            !prevent circling
+!	       	  IF (i_tneighbours(1, i_telmt_loc)==i_prevtidx(j_cnt)) THEN
+!		    l_circled = .TRUE.
+!		    EXIT
+!        	  END IF
+!	       	END DO
+!        	IF (.NOT. l_circled) THEN
+!        	  i_prevtidx(i_srch_cnt) = i_tindex
+        	  i_tindex= i_tneighbours(1, i_telmt_loc)
+        	  l_tfound = .FALSE. 
+        	  EXIT
+!        	END IF
+              END IF   
+            END IF
+	    !------
+	       
+          END DO elmt_loop
+          !------
+          
+          !------ neighbour tetra does not exist, mass point outside the mesh, mass lost; check next mass point
+          IF (i_tindex==0) THEN
+            p_MPtable(i_MPcnt)%MP%i_MPinTetra = 0
+            p_MPtable(i_MPcnt)%MP%l_searchMP = .FALSE.
+            p_MPtable(i_MPcnt)%MP%l_assignvalue = .FALSE.
+            EXIT
+          END IF
+          !------
+          
+          !------ tetra found! remember tetra for assigning the mass point's mass to the tetranodes later, check next mass point
+          IF (l_tfound) THEN 
+            p_MPtable(i_MPcnt)%MP%i_MPinTetra = i_tindex
+            p_MPtable(i_MPcnt)%MP%l_searchMP = .FALSE.
+            p_MPtable(i_MPcnt)%MP%l_assignvalue = .TRUE. 
+            EXIT
+          END IF
+          !------
+                  
+          !------ tetra not found: stay in search_loop and search on with next tetra (no EXIT command)
+        END DO search_loop
+
+	RETURN
+	
+      END SUBROUTINE searchMP
+      
+!*****************************************************************
+
+      FUNCTION assign_mass(r_tn_coor, r_mp_coor, r_mp_mass) RESULT(r_nmass_tmp)
+    
+!---------- local declarations
+
+        IMPLICIT NONE   
+	REAL, DIMENSION(GRID_dimension, GRID_tetranodes), INTENT(in)    :: r_tn_coor
+	REAL, DIMENSION(GRID_dimension), INTENT(in)         		:: r_mp_coor
+	REAL, INTENT(in)                        			:: r_mp_mass
+    
+	REAL, DIMENSION(GRID_tetranodes)              			:: r_nmass_tmp
+
+	REAL, DIMENSION(GRID_dimension, GRID_tetranodes-1)     		:: r_A
+	REAL, DIMENSION(GRID_dimension)                 		:: r_b
+	REAL, DIMENSION(GRID_tetranodes)                		:: r_x, r_y, r_z
+	REAL                                				:: r_det, r_det1, r_det2, r_det3
+    
+	INTEGER                             				:: i_node_cnt
+    
+
+!----------assign mass of a mass point to the nodes of a tetra  
+    
+	DO i_node_cnt=1, GRID_tetranodes
+	  r_x(i_node_cnt) = r_tn_coor(1,i_node_cnt)
+	  r_y(i_node_cnt) = r_tn_coor(2,i_node_cnt)
+	  r_z(i_node_cnt) = r_tn_coor(3,i_node_cnt)
+	END DO
+
+!--------- normalize tetra and mass point coordinates   
+	r_A(1,1) = r_x(2) - r_x(1)
+	r_A(1,2) = r_x(3) - r_x(1)
+	r_A(1,3) = r_x(4) - r_x(1)
+	r_A(2,1) = r_y(2) - r_y(1)
+	r_A(2,2) = r_y(3) - r_y(1)
+	r_A(2,3) = r_y(4) - r_y(1)
+	r_A(3,1) = r_z(2) - r_z(1)
+	r_A(3,2) = r_z(3) - r_z(1)
+	r_A(3,3) = r_z(4) - r_z(1)
+        
+	r_b(1) = r_mp_coor(1) - r_x(1)
+	r_b(2) = r_mp_coor(2) - r_y(1)
+	r_b(3) = r_mp_coor(3) - r_z(1)
+
+!--------- solve linear equation system (dim3x3)(dim3)=(dim3) via Cramer        
+	r_det  =   r_A(1,1)*r_A(2,2)*r_A(3,3) + r_A(1,2)*r_A(2,3)*r_A(3,1) + r_A(1,3)*r_A(2,1)*r_A(3,2) &
+		- (r_A(3,1)*r_A(2,2)*r_A(1,3) + r_A(3,2)*r_A(2,3)*r_A(1,1) + r_A(3,3)*r_A(2,1)*r_A(1,2))
+		
+	r_det1 =   r_b(1)*r_A(2,2)*r_A(3,3) + r_A(1,2)*r_A(2,3)*r_b(3) + r_A(1,3)*r_b(2)*r_A(3,2) &
+		- (r_b(3)*r_A(2,2)*r_A(1,3) + r_A(3,2)*r_A(2,3)*r_b(1) + r_A(3,3)*r_b(2)*r_A(1,2))
+	r_det2 =   r_A(1,1)*r_b(2)*r_A(3,3) + r_b(1)*r_A(2,3)*r_A(3,1) + r_A(1,3)*r_A(2,1)*r_b(3) &
+		- (r_A(3,1)*r_b(2)*r_A(1,3) + r_b(3)*r_A(2,3)*r_A(1,1) + r_A(3,3)*r_A(2,1)*r_b(1))
+	r_det3 =   r_A(1,1)*r_A(2,2)*r_b(3) + r_A(1,2)*r_b(2)*r_A(3,1) + r_b(1)*r_A(2,1)*r_A(3,2) &   
+		- (r_A(3,1)*r_A(2,2)*r_b(1) + r_A(3,2)*r_b(2)*r_A(1,1) + r_b(3)*r_A(2,1)*r_A(1,2))
+        
+	r_nmass_tmp(4) = r_det3 / r_det *r_mp_mass
+	r_nmass_tmp(3) = r_det2 / r_det *r_mp_mass
+	r_nmass_tmp(2) = r_det1 / r_det *r_mp_mass
+	r_nmass_tmp(1) = r_mp_mass - r_nmass_tmp(4) - r_nmass_tmp(3) - r_nmass_tmp(2)
+        
+	RETURN
+	
+      END FUNCTION assign_mass
+      
+!*****************************************************************
+
+      FUNCTION cross_product(r_a, r_b) RESULT (r_result)
+
+!---------- local declarations
+
+        IMPLICIT NONE
+
+	REAL, DIMENSION(3), INTENT(in)			:: r_a, r_b
+	REAL, DIMENSION(3)				:: r_result
+
+
+!---------- calculate the cross product of two given vectors r_a and r_b
+
+	r_result(1) 	= (r_a(2)*r_b(3)) - (r_a(3)*r_b(2))
+	r_result(2)	= (r_a(3)*r_b(1)) - (r_a(1)*r_b(3))
+	r_result(3)	= (r_a(1)*r_b(2)) - (r_a(2)*r_b(1))
+	
+	RETURN
+	
+      END FUNCTION cross_product
+      
+!*****************************************************************************
+
+      FUNCTION samesid_3d(r_vtx_a, r_vtx_b, r_vtx_c, r_vtx_ref, r_vtx_check) RESULT (l_same)
+
+
+!---------- Check if a given 3d-point r_vtx_check is on the same side of a plane (defined by three points r_vtx_a, r_vtx_b, r_vtx_c) 
+!---------- as a known reference point r_vtx_ref
+
+
+!---------- local declarations
+
+	IMPLICIT NONE
+
+	REAL, DIMENSION(GRID_dimension), INTENT(in)	:: r_vtx_a, r_vtx_b, r_vtx_c, r_vtx_ref, r_vtx_check
+	LOGICAL 					:: l_same
+
+	REAL, DIMENSION(GRID_dimension)			:: r_a, r_b, r_tmp1, r_tmp2, r_tmp3
+	REAL						:: r_value, r_dot1, r_dot2
+    
+
+!---------- initialize
+    
+	l_same = .FALSE.
+
+	  
+!----------   calculate cross products
+
+	r_tmp1 = r_vtx_c - r_vtx_a
+	r_tmp2 = r_vtx_b - r_vtx_a
+	
+	r_a = cross_product(r_tmp1, r_tmp2)
+    
+    
+!---------- if  r_value >= 0, r_vtx_check is on the same side as r_vtx_ref
+	r_tmp3  = 1.e+6*r_vtx_a	
+	r_tmp1 	= 1.e+6*r_vtx_check - r_tmp3
+	r_tmp2 	= 1.e+6*r_vtx_ref   - r_tmp3
+	
+	r_dot1 	= DOT_PRODUCT( r_a, r_tmp1)
+	r_dot2	= DOT_PRODUCT( r_a, r_tmp2)
+	
+	r_value	= (r_dot1*r_dot2)
+
+!	IF (r_dot1 == 0.) l_same = .TRUE.	
+!	IF (r_dot2 == 0.) l_same = .TRUE.
+	IF (r_value >= 0.) l_same = .TRUE.
+
+	RETURN
+	
+      END FUNCTION samesid_3d
+      
+!*****************************************************************
+
+      FUNCTION calc_vol(r_coord1, r_coord2, r_coord3, r_coord4) RESULT (r_volume)
+ 
+!---------- local declarations
+ 
+	IMPLICIT NONE
+ 
+	REAL, DIMENSION(GRID_dimension), INTENT(in) 	:: r_coord1, r_coord2, r_coord3, r_coord4
+
+	REAL, DIMENSION(GRID_dimension)			:: r_a, r_b, r_c, r_tmp
+	REAL                                        	:: r_volume
+ 
+
+ 
+!---------- calculate vector components
+ 
+	r_a= r_coord2- r_coord1
+	r_b= r_coord3- r_coord1
+	r_c= r_coord4- r_coord1
+ 
+!---------- calculate cross product vector
+ 
+	r_tmp= cross_product(r_b, r_c)
+           
+ 
+!---------- calculate volume of a tetrahedron: V =  <r_a,  (r_b x r_c)> / 6.
+ 
+	r_volume = ABS(DOT_PRODUCT(r_a, r_tmp) / 6.)
+ 
+	RETURN
+	
+      END FUNCTION calc_vol
+      
+!****************************************************************
+
+!*****************************************************************
+
+      SUBROUTINE generate_MP_coeff(p_ghand)
+
+!---------- local declarations
+
+	IMPLICIT NONE
+    
+	TYPE (grid_handle), DIMENSION(GRID_timesteps)	:: p_ghand
+    
+	INTEGER                     			:: i_reflvl_max     		! maximum refinement level
+	INTEGER                     			:: i_celltot        		! total number of cells in tetra; reflvl 1: 4MPs, 2: 10MPs, 3: 20 MPs, 4: 35MPs, etc.
+    
+	INTEGER                     			:: i_cnt, j_cnt, k_cnt		! loop counter
+	INTEGER                     			:: i_mpcnt, i_loop    		! mass point counter
+	INTEGER                     			:: i_cindex     		! coefficient index
+	INTEGER                     			:: i_alct       		! allocated flag, error if nonzero
+    
+	INTEGER                     			:: i_origin     		! local 
+	INTEGER, DIMENSION(3)     			:: i_prvdir     		! local
+    
+	REAL                        			:: r_projfac       		! projection factor
+	REAL                        			:: r_fac        		! factor
+    
+	REAL, DIMENSION(GRID_tetranodes)		:: r_mpc_sum        		! checksum; check if the mass coefficients sum up to 1
+    
+	REAL                        			:: r_vol_sum        		! checksum; check if the volume coefficient sums up to 1
+    
+!	REAL                        			:: r_eps        		! epsilon; very small number greater than 0
+    
+	TYPE (MP_coeff), POINTER           		:: p_MPC_tmp(:)
+	TYPE (MP_coeff_arr), POINTER      		:: p_MPCarray_tmp
+
+    
+!---------- initializations
+!	i_reflvl_max = p_ghand(i_timeplus)%i_reflvlbnd - p_ghand(i_timeplus)%i_crslvlbnd + 5
+!	IF (i_reflvl_max > 27) THEN
+	  i_reflvl_max = 17
+!	END IF 
+    
+	MAX_REFLVL = i_reflvl_max
+    
+!	r_eps   = 1.E-5
+    
+    
+!---------- allocate arrays
+	ALLOCATE (p_MPCtable(i_reflvl_max), stat = i_alct)
+	IF (i_alct /= 0) CALL grid_error(60)
+ 
+
+	i_celltot = 1 
+	DO i_cnt = 1, i_reflvl_max  
+	  i_celltot = i_celltot + ((i_cnt+1)*(i_cnt+2))/2
+      
+	  ALLOCATE (p_MPC_tmp(i_celltot), stat = i_alct)
+	  IF (i_alct /= 0) CALL grid_error(60)
+      
+	  ALLOCATE (p_MPCarray_tmp, stat = i_alct)
+ 	  IF (i_alct /= 0) CALL grid_error(60)
+
+	  p_MPCarray_tmp%mpc => p_MPC_tmp
+            
+	  p_MPCtable(i_cnt)%i_cnum = i_celltot      
+	  p_MPCtable(i_cnt)%p_mpc => p_MPCarray_tmp
+      
+	END DO
+	NULLIFY(p_MPC_tmp)
+	NULLIFY(p_MPCarray_tmp)
+!----------
+
+    
+!---------- set refinement level 1; 4 MPs
+	DO i_mpcnt= 1, 4
+	  
+	  p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_origin = i_mpcnt
+	  
+	  IF (i_mpcnt <= 2) THEN
+	    p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_prvdir   = i_mpcnt
+	  ELSE
+	    IF (i_mpcnt == 3) THEN
+	      p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)= 1
+	      p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)= 2
+	      p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)= 0
+	    ELSE
+	      IF (i_cnt == 4) THEN 
+		p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)= 3
+		p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)= 1
+		p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)= 2
+	      END IF
+	    END IF
+	  END IF
+           
+	  p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%i_celltype   = 1
+	  p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%r_volume = 1./4.
+      
+	  DO j_cnt=1,4
+	    IF (j_cnt == i_mpcnt) THEN
+	      p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%r_coeff(j_cnt)   = 45./96.
+	      p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%r_mass(j_cnt)    = 45./96.
+	    ELSE
+	      p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%r_coeff(j_cnt)   = 17./96.
+	      p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%r_mass(j_cnt)    = 17./96.
+	    END IF
+	  END DO
+	       
+	  p_MPCtable(1)%p_mpc%mpc(i_mpcnt)%l_end        = .FALSE.
+	  
+	END DO
+
+	p_MPCtable(1)%p_mpc%mpc(1)%l_end = .FALSE.  ! this is the starting node, if you see the mass points in a tree structure
+!-----------
+
+
+!----------- generate mass points of higher refinement levels   
+	DO i_cnt = 2, i_reflvl_max
+	  i_mpcnt = 0
+	  r_projfac = REAL(i_cnt-1) / REAL(i_cnt)
+	  
+	  DO j_cnt=1 , p_MPCtable(i_cnt-1)%i_cnum
+            ! project old mass point in direction of his origin (only if MP is not generator of new points (l_end==.TRUE.)); set l_end = .FALSE.
+	    i_mpcnt = i_mpcnt + 1
+	    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt) = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)
+            
+     
+            !projection here (volume, coeff, mass changes)
+
+            !volume proj.
+	    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume = r_projfac*r_projfac*r_projfac *&
+		p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_volume
+
+            !projection in direction of the origin
+	    i_origin = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_origin
+	    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_origin) = &
+		(1.-r_projfac) + r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_origin)
+	    DO i_loop = 1, 3
+	      i_cindex = MODULO((i_origin+i_loop-1),4) + 1
+	      p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_cindex) = &
+		r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_cindex)
+	    END DO
+
+	    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end = .FALSE.
+                
+	    IF (p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%l_end) THEN
+            ! create new mass points via projecting the old points which are at the end of the tree
+        
+	      SELECT CASE(p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype)
+		CASE(1) ! corner points are not to be reproduced
+		  CALL grid_error(c_error='[generate_MP_coeff]: This should never happen. L. Mentrup')
+		  
+		CASE(2) ! edge points are to be projected versus the origin and additionally one point to the other edgecorner
+		  i_mpcnt = i_mpcnt +1
+		  !volume
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume = r_projfac*r_projfac*r_projfac *&
+			p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_volume
+
+		  !projection in direction of the other edge corner
+		  i_prvdir = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_prvdir(1)) = &
+			(1.-r_projfac) + r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_prvdir(1))
+		  DO i_loop = 1, 3
+		    i_cindex = MODULO((i_prvdir(1)+i_loop-1),4)+1
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_cindex) = &
+			r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_cindex)
+		  END DO    
+          
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin     = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_origin
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_celltype
+	 	  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end        = .TRUE.
+          
+		CASE(3) ! area points are to be projected versus the origin and additionally one or two point to the other areacorners
+		  i_mpcnt = i_mpcnt +1
+
+		  !projection in direction of the other area corner
+		  i_prvdir = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_prvdir(1)) = &
+			(1.-r_projfac) + r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_prvdir(1))
+		  DO i_loop = 1, 3
+		    i_cindex = MODULO((i_prvdir(1)+i_loop-1),4)+1
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_cindex) = &
+		  	r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_cindex)
+		  END DO
+          
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin     = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_origin
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_celltype
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end        = .TRUE.
+          
+		  IF (p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1) /= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)) THEN
+		    i_mpcnt = i_mpcnt +1
+            
+		    !projection in direction of the other area corner
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_prvdir(2)) = &
+			(1.-r_projfac) + r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_prvdir(2))
+		    DO i_loop = 1, 3
+		      i_cindex = MODULO((i_prvdir(2)+i_loop-1),4)+1
+		      p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_cindex) = &
+			r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_cindex)
+		    END DO
+
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_origin
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_celltype
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end		= .TRUE.
+		  END IF
+          
+		CASE(4) ! space points are to be projected versus the origin and additionally one, two or three to the other tetrahedron corners
+		  i_mpcnt = i_mpcnt +1
+
+		  !projection in direction of the other area corner
+		  i_prvdir = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_prvdir(1)) = &
+			(1.-r_projfac) + r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_prvdir(1))
+		  DO i_loop = 1, 3
+		    i_cindex = MODULO((i_prvdir(1)+i_loop-1),4)+1
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_cindex) = &
+			r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_cindex)
+		  END DO
+          
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin		= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_origin
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_celltype
+		  p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end		= .TRUE.
+          
+		  IF (p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1) /= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)) THEN
+		    i_mpcnt = i_mpcnt +1
+		    !volume
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume = r_projfac*r_projfac*r_projfac *&
+			p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_volume
+
+		    !projection in direction of the other area corner
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_prvdir(2)) = &
+			(1.-r_projfac) + r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_prvdir(2))
+		    DO i_loop = 1, 3
+		      i_cindex = MODULO((i_prvdir(2)+i_loop-1),4)+1
+		      p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_cindex) = &
+			r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_cindex)
+		    END DO
+
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_origin
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_celltype
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end		= .TRUE.
+		  END IF
+          
+	          IF (p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1) /= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2) .AND. &
+		      p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2) /= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(3) .AND. &
+	              p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(3) /= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)) THEN
+		   
+		    i_mpcnt = i_mpcnt +1
+
+		    !projection in direction of the other area corner
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_prvdir(3)) = &
+			(1.-r_projfac) + r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_prvdir(3))
+		    DO i_loop = 1, 3
+		      i_cindex = MODULO((i_prvdir(3)+i_loop-1),4)+1
+		      p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(i_cindex) = &
+			r_projfac* p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%r_coeff(i_cindex)
+		    END DO
+
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin   	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_origin
+	 	    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)    = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(3)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)    = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(1)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)    = p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_prvdir(2)
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype 	= p_MPCtable(i_cnt-1)%p_mpc%mpc(j_cnt)%i_celltype
+		    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end      	= .TRUE.
+		  END IF
+                  
+	      END SELECT
+            END IF
+	  END DO  
+    
+        
+	  !---------- generate new MPs of refinement level 2; 6 additional MPs
+	  IF (i_cnt == 2) THEN
+            !new point nr. 1
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 7./66. 
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 4
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+            !new point nr. 2
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 7./66. 
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 4
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+            !new point nr. 3
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 26./66. 
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 4
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+            !new point nr. 4
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 7./66. 
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+            !new point nr. 5
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 26./66. 
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+            !new point nr. 6
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 26./66. 
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 26./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 7./66.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+          END IF
+          !-----------
+
+          !---------- generate new MPs of refinement level 3; 4 additional MPs
+          IF (i_cnt == 3) THEN
+            !new point nr. 1
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 1./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 4
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+            !new point nr. 2
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 1./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 4
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+            !new point nr. 3
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 1./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 4
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+            !new point nr. 4
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 4./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 1./13.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 0
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+          END IF
+          !-----------
+
+          !---------- generate new MPs of refinement level 4; 1 additional MPs
+          IF (i_cnt == 4) THEN
+            !new point nr. 1
+            i_mpcnt = i_mpcnt +1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)   = 1./4.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)   = 1./4.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)   = 1./4.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)   = 1./4.
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_origin = 4
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(1)  = 2
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(2)  = 1
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_prvdir(3)  = 3
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype   = 4
+            p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%l_end    = .TRUE.
+
+          END IF
+          !-----------
+
+          !assign volume coefficients
+          r_fac = REAL(i_cnt)*REAL(i_cnt)*REAL(i_cnt)
+          DO i_mpcnt=1, p_MPCtable(i_cnt)%i_cnum
+            SELECT CASE(p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%i_celltype)
+            CASE(1)
+              p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume = 1./4. / r_fac
+            CASE(2)
+              p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume = 14./12. / r_fac
+            CASE(3)
+              p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume = 3. / r_fac
+            CASE(4)
+              p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume = 6. / r_fac
+            END SELECT    
+          END DO
+        
+	  ! assign mass coefficients; 
+	  r_mpc_sum = 0
+	  DO i_mpcnt=1, p_MPCtable(i_cnt)%i_cnum
+	    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_mass = &
+		p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_coeff * &
+		p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume
+	    r_mpc_sum = r_mpc_sum + p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_mass
+	  END DO
+        
+	  DO i_mpcnt=1, p_MPCtable(i_cnt)%i_cnum
+	    p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_mass = p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_mass / r_mpc_sum     
+	  END DO
+        
+!----------- check if mass/volume coefficients sum up to 1 
+!	  r_mpc_sum = 0
+!	  r_vol_sum = 0
+!	  DO i_mpcnt=1, p_MPCtable(i_cnt)%i_cnum
+!	    r_mpc_sum = r_mpc_sum + p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_mass
+!	   r_vol_sum = r_vol_sum + p_MPCtable(i_cnt)%p_mpc%mpc(i_mpcnt)%r_volume
+!	  END DO
+!             
+!	  IF ((r_mpc_sum(1) < (1.-r_eps)) .OR. (r_mpc_sum(1) > (1.+r_eps))) THEN
+!	    CALL grid_error(c_error='[generate_MP_coeff] Mass point coefficient r_mass(1) doesnt sum up to 1.')
+!	  END IF
+!	  IF ((r_mpc_sum(2) < (1.-r_eps)) .OR. (r_mpc_sum(2) > (1.+r_eps))) THEN
+!	    CALL grid_error(c_error='[generate_MP_coeff] Mass point coefficient r_mass(2) doesnt sum up to 1.')
+!	  END IF
+!	  IF ((r_mpc_sum(3) < (1.-r_eps)) .OR. (r_mpc_sum(3) > (1.+r_eps))) THEN
+!	    CALL grid_error(c_error='[generate_MP_coeff] Mass point coefficient r_mass(3) doesnt sum up to 1.')
+!	  END IF
+!	  IF ((r_mpc_sum(4) < (1.-r_eps)) .OR. (r_mpc_sum(4) > (1.+r_eps))) THEN
+!	    CALL grid_error(c_error='[generate_MP_coeff] Mass point coefficient r_mass(4) doesnt sum up to 1.')
+!	  END IF
+!       
+!	  IF ((r_vol_sum < (1.-r_eps)) .OR. (r_vol_sum > (1.+r_eps))) THEN
+!	    CALL grid_error(c_error='[generate_MP_coeff] Mass point coefficient r_volume doesnt sum up to 1.')
+!	  END IF
+!-----------   
+      
+	END DO
+      
+	CALL io_MP_coeff(p_MPCtable)
+    
+	RETURN
+    
+      END SUBROUTINE generate_MP_coeff
+
+!*****************************************************************
+
+      SUBROUTINE createMPs(p_MPtable,p_MPtable_tmp,i_MPnum, i_tim, r_coor, i_nnum_old, i_tnodes_old, i_tnum_f_old)
+      
+!---------- local declarations
+
+	IMPLICIT NONE
+      
+	TYPE (MP_entry_ptr), DIMENSION(i_MPnum), INTENT(in)	:: p_MPtable
+	TYPE (MP_entry_ptr), DIMENSION(i_MPnum), INTENT(inout)	:: p_MPtable_tmp
+	INTEGER, INTENT(inout)                    		:: i_MPnum      ! Number of mass points
+	INTEGER, INTENT(in)                       		:: i_tim
+      
+	REAL, DIMENSION(GRID_dimension, i_nnum_old), INTENT(in)	:: r_coor       ! coordinates array of tetra nodes (old mesh)
+	INTEGER, INTENT(in)                       		:: i_nnum_old   ! number of nodes in mesh (old mesh)
+      
+	INTEGER, DIMENSION(GRID_tetranodes, i_tnum_f_old), INTENT(in) 	:: i_tnodes_old     ! index array of tetra nodes (old mesh)
+	INTEGER, INTENT(in)                       			:: i_tnum_f_old     ! Number of tetras in this step
+	INTEGER                           				:: i_treflvl        ! refinement level of a tetra
+
+	REAL, DIMENSION(GRID_tetranodes)              		:: r_nmass_tmp      ! mass at the nodes of the tetra
+	REAL                              			:: r_mass_tot, r_mass_in_tetra
+      
+	INTEGER                           			:: i_MPnum_new
+	INTEGER                           			:: i_MPidx        
+	INTEGER                           			:: i_cnt, i_tetra_cnt, i_MP_cnt, i_node_cnt, i_dim  ! loop counter
+	INTEGER                               			:: i_alct
+      
+      
+	TYPE (MP_entry), POINTER                  		:: p_MP
+
+
+
+!----------- preinitialize
+
+	i_MPnum_new = 0
+
+
+!----------- allocate memory for new mass points       
+	DO i_MP_cnt=1, i_MPnum
+          ALLOCATE(p_MP, stat=i_alct)
+          IF (i_alct /= 0) CALL grid_error(60)
+          p_MP%i_MPbyTetra = 0
+          p_MP%i_MPinTetra = 0
+          p_MP%r_mass = 0.
+          p_MP%r_volume = 0.
+          p_MP%r_coord = 0.
+          p_MP%l_searchMP = .FALSE.
+          p_MP%l_assignvalue = .FALSE.
+          p_MPtable_tmp(i_MP_cnt)%MP => p_MP
+	  NULLIFY(p_MP)
+	END DO
+
+        
+!----------- if already searched for mass points, save mass points which are already found and that can be assigned to the nodes later
+	DO i_tetra_cnt=1, i_tnum_f_old
+          IF ((.NOT. p_ttable(i_tim, i_tetra_cnt)%cp%l_searchtetra) .AND. (p_ttable(i_tim, i_tetra_cnt)%cp%i_MPindex(1) /= 0)) THEN
+            DO i_MP_cnt = 1, p_ttable(i_tim, i_tetra_cnt)%cp%i_MPperTetra
+              i_MPidx = p_ttable(i_tim, i_tetra_cnt)%cp%i_MPindex(i_MP_cnt)
+              i_MPnum_new = i_MPnum_new + 1
+
+              p_MPtable_tmp(i_MPnum_new)%MP%i_MPinTetra 	= p_MPtable(i_MPidx)%MP%i_MPinTetra
+              p_MPtable_tmp(i_MPnum_new)%MP%i_MPbyTetra 	= p_MPtable(i_MPidx)%MP%i_MPbyTetra
+              p_MPtable_tmp(i_MPnum_new)%MP%r_mass  		= p_MPtable(i_MPidx)%MP%r_mass
+              p_MPtable_tmp(i_MPnum_new)%MP%r_coord 		= p_MPtable(i_MPidx)%MP%r_coord
+              p_MPtable_tmp(i_MPnum_new)%MP%r_volume		= p_MPtable(i_MPidx)%MP%r_volume
+              p_MPtable_tmp(i_MPnum_new)%MP%l_searchMP 		= p_MPtable(i_MPidx)%MP%l_searchMP
+              p_MPtable_tmp(i_MPnum_new)%MP%l_assignvalue	= p_MPtable(i_MPidx)%MP%l_assignvalue
+
+              p_ttable(i_tim, i_tetra_cnt)%cp%i_MPindex(i_MP_cnt) = i_MPnum_new
+            END DO
+          END IF
+	END DO
+      
+
+!----------- set values for mass points;               
+	DO i_tetra_cnt= 1, i_tnum_f_old
+          IF (p_ttable(i_tim, i_tetra_cnt)%cp%l_searchtetra) THEN
+            r_nmass_tmp = p_ttable(i_tim, i_tetra_cnt)%cp%r_value
+            r_mass_in_tetra = SUM(r_nmass_tmp)
+            i_treflvl = p_ttable(i_tim, i_tetra_cnt)%cp%i_refinelvl
+
+            IF (r_mass_in_tetra > 0.) THEN   
+              DO i_MP_cnt = 1, p_MPCtable(i_treflvl)%i_cnum 
+        	i_MPnum_new = i_MPnum_new + 1
+        	p_MPtable_tmp(i_MPnum_new)%MP%i_MPbyTetra = i_tetra_cnt 
+!------------------ stepfct assignment
+        	DO i_node_cnt= 1, GRID_tetranodes
+                  p_MPtable_tmp(i_MPnum_new)%MP%r_coord = p_MPtable_tmp(i_MPnum_new)%MP%r_coord + &
+                           (p_MPCtable(i_treflvl)%p_mpc%mpc(i_MP_cnt)%r_coeff(i_node_cnt)&
+                      	   *r_coor(:,i_tnodes_old(i_node_cnt, i_tetra_cnt)))
+        	END DO
+        	p_MPtable_tmp(i_MPnum_new)%MP%r_mass = &
+                  SUM(p_MPCtable(i_treflvl)%p_mpc%mpc(i_MP_cnt)%r_mass * r_nmass_tmp)
+!------------------
+        	p_MPtable_tmp(i_MPnum_new)%MP%r_volume = &
+                      p_MPCtable(i_treflvl)%p_mpc%mpc(i_MP_cnt)%r_volume * &
+                      p_ttable(i_tim, i_tetra_cnt)%cp%r_volume
+        	p_MPtable_tmp(i_MPnum_new)%MP%l_searchMP = .TRUE.
+        	p_MPtable_tmp(i_MPnum_new)%MP%l_assignvalue = .FALSE.
+
+        	p_ttable(i_tim, i_tetra_cnt)%cp%i_MPindex(i_MP_cnt) = i_MPnum_new
+              END DO
+            END IF            
+          END IF
+	END DO 
+      
+	i_MPnum = i_MPnum_new    
+
+	RETURN
+      
+      END SUBROUTINE createMPs
+    
+!*****************************************************************
+
+      SUBROUTINE remove_MP_coeff
+
+!---------- local declarations
+	IMPLICIT NONE
+    
+	TYPE(grid_handle), DIMENSION(GRID_timesteps)    :: p_ghand   
+	INTEGER                     			:: i_reflvl_max     ! maximum refinement level
+	INTEGER                     			:: i_cnt
+    
+!---------- initializations
+	i_reflvl_max = size(p_MPCtable)
+    
+!----------
+	DO i_cnt = 1, i_reflvl_max
+      	  DEALLOCATE(p_MPCtable(i_cnt)%p_mpc%mpc)
+      	  DEALLOCATE(p_MPCtable(i_cnt)%p_mpc)
+	END DO 
+    
+	DEALLOCATE(p_MPCtable)
+    
+	RETURN
+    
+      END SUBROUTINE remove_MP_coeff
+      
+!*****************************************************************
+
+      SUBROUTINE io_MP_coeff(p_MPCtable)
+
+!---------- local declarations
+	IMPLICIT NONE
+    
+	TYPE (MP_coeff_arr_ptr), DIMENSION(MAX_REFLVL)  :: p_MPCtable
+    
+	INTEGER                     		:: i_reflvl_max     ! maximum refinement level
+    
+	INTEGER                              	:: i_io1, i_io2, i_fst
+	INTEGER                              	:: i_cnt, j_cnt, i_tcnt, i_mpcnt, i_filecnt
+	INTEGER					:: i_alct, i_nnum, i_tnum, i_dim
+      	INTEGER                  		:: i_timecounter
+      	REAL, DIMENSION(:,:), ALLOCATABLE    	:: r_cox
+      	CHARACTER (len=11)                   	:: c_mfile
+	CHARACTER (len=32)			:: c_matfile
+      	CHARACTER (len=8)                    	:: c_tmp
+      
+      	REAL, DIMENSION(3)            		:: r_a = (/0.,0.,0./)
+      	REAL, DIMENSION(3)            		:: r_b = (/1.,0.,0./)
+      	REAL, DIMENSION(3)            		:: r_c = (/0.,1.,0./)
+      	REAL, DIMENSION(3)            		:: r_d = (/0.,0.,1./)
+
+    
+!---------- initializations
+    	i_reflvl_max = MAX_REFLVL
+    	i_timecounter = 0
+
+
+    	DO i_filecnt=1, i_reflvl_max
+!---------- file handling (open)
+     
+      	  i_tcnt= i_timecounter
+      	  i_timecounter= i_timecounter+1
+      	  write(c_mfile,10101) 'MP_gmv.', i_tcnt
+	  write(c_matfile,10102) 'MP_matlab.', i_tcnt
+      	  c_mfile= adjustl(c_mfile)
+	  c_matfile= adjustl(c_matfile)
+      	  i_io1= 15
+      	  OPEN(i_io1, file= c_mfile, form= 'formatted', iostat= i_fst)
+      	  IF(i_fst /= 0) THEN
+            RETURN
+      	  END IF
+	  
+	  i_io2 = 16
+	  OPEN(i_io2, file= c_matfile, form= 'formatted', iostat= i_fst)
+	  IF (i_fst/=0) THEN
+	    RETURN
+	  END IF
+
+!---------- write header
+
+      	  WRITE(i_io1,1000)
+      	  WRITE(i_io1,1001)
+      	  WRITE(i_io1,1002) c_mfile
+      	  WRITE(i_io1,1003) GRID_parameters%program_name, GRID_parameters%version, GRID_parameters%subversion, &
+            GRID_parameters%patchversion
+      	  WRITE(i_io1,1004) GRID_parameters%author_name, GRID_parameters%author_email
+      	  WRITE(i_io1,1005)
+
+!---------- the nodes
+
+      	  i_nnum = p_MPCtable(i_filecnt)%i_cnum
+      	  WRITE(i_io1,1010) i_nnum+4
+
+!---------- extract nodal grid data
+
+      	  ALLOCATE(r_cox(GRID_dimension, i_nnum+4), stat=i_alct)
+      	  IF(i_alct /= 0) CALL grid_error(11)
+      
+      	  r_cox(:,1) = r_a
+      	  r_cox(:,2) = r_b
+      	  r_cox(:,3) = r_c
+      	  r_cox(:,4) = r_d
+
+      	  DO i_mpcnt = 1, i_nnum
+            r_cox(:,i_mpcnt+4) = p_MPCtable(i_filecnt)%p_mpc%mpc(i_mpcnt)%r_coeff(1)*r_a + &
+                      	p_MPCtable(i_filecnt)%p_mpc%mpc(i_mpcnt)%r_coeff(2)*r_b + &
+                     	p_MPCtable(i_filecnt)%p_mpc%mpc(i_mpcnt)%r_coeff(3)*r_c + &
+                     	p_MPCtable(i_filecnt)%p_mpc%mpc(i_mpcnt)%r_coeff(4)*r_d 
+      	  END DO
+        
+      	  DO i_dim=1,GRID_dimension
+            WRITE(i_io1,1011) (r_cox(i_dim,i_cnt), i_cnt=1,i_nnum+4)
+      	  END DO
+	  
+	  DO i_cnt = 1, i_nnum+4
+	    WRITE(i_io2,1012) r_cox(1, i_cnt), r_cox(2, i_cnt), r_cox(3,i_cnt)
+	  END DO
+	  
+      	  DEALLOCATE(r_cox)
+
+!---------- the elements
+
+      	  i_tnum = 1
+      	  WRITE(i_io1,1020) i_tnum
+      	  WRITE(i_io1,1021)
+      	  WRITE(i_io1, *) '1 2 3 4'
+      
+
+!---------- close file
+
+      	  WRITE(i_io1,1100)
+      	  CLOSE(i_io1)
+	  
+	  CLOSE(i_io2)
+      
+	END DO  
+
+	RETURN
+	
+	1000	FORMAT('gmvinput ascii')
+	1001	FORMAT('comments')
+	1002    FORMAT(' File: ',a48)
+	1003    FORMAT(' Written by: ',a15,' Version ',i1,'.',i1,'.',i1)
+	1004    FORMAT(' Author: ',a48,' <',a48,'>')
+	1005    FORMAT('endcomm')
+	1010    FORMAT('nodes ',i8)
+	1011    FORMAT(10f15.5)
+	1012	FORMAT(3f15.5)
+	1020    FORMAT('cells ',i8)
+	1021    FORMAT('tet 4')
+	1022    FORMAT(10i8)
+	1031    FORMAT('cellids')
+	1040    FORMAT('variable')
+	1041    FORMAT('level 0')
+	1043    FORMAT('status 0')
+	1042    FORMAT('tracr 1')
+	1049    FORMAT('endvars')
+	1100    FORMAT('endgmv')
+	10101	FORMAT(a7,i4.4)
+    	10102	FORMAT(a10,i4.4)
+	
+      END SUBROUTINE io_MP_coeff
+      
+!*****************************************************************
+
+END MODULE SLM_advanced

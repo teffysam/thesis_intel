@@ -1,0 +1,485 @@
+!*****************************************************************
+!
+! MODULE NAME:
+!	ADV_wind
+! FUNCTION:
+!	calculate the windfield for the advection problem
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_windfield
+! FUNCTION:
+!	calculate the advecting force for simple advection
+! SYNTAX:
+!	real.arr= slm_windfield(real.arr, real)
+! ON INPUT:
+!	r_coord: coordinates of point		real
+!	r_time:  time coordinate (optional)	real
+! ON OUTPUT:
+!	r_field: windfield			real
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! PUBLIC:
+!
+! COMMENTS:
+!
+! USES:
+!	MISC_globalparam, MISC_error
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	12/97
+!	2. bug fix concerning interp.	j. behrens	2/98
+!	3. compliant to amatos 1.0	j. behrens	12/2000
+!
+!*****************************************************************
+	MODULE ADV_wind
+	  USE FLASH_parameters
+	  USE GRID_api
+	  PRIVATE
+	  INTEGER, PARAMETER              :: i_ioerr=0
+!---------- These are the known grid parameters, we do not attempt to be flexible here
+	  INTEGER                         :: i_nx
+	  INTEGER                         :: i_ny
+	  INTEGER                         :: i_nz
+	  INTEGER                         :: i_ioncin
+	  INTEGER                         :: i_dims, i_vars
+	  INTEGER                         :: i_curday, i_curhour
+	  INTEGER                         :: i_maxday, i_maxhour
+	  REAL                            :: r_tslen
+	  REAL                            :: r_dx= 2000.0
+	  REAL                            :: r_dy= 2000.0
+	  REAL                            :: r_dxi= 1./2000.0
+	  REAL                            :: r_dyi= 1./2000.0
+	  INTEGER, PARAMETER              :: i_nzp= 10
+	  REAL, DIMENSION(i_nzp)          :: r_dz, r_dzi, r_z
+	  REAL, SAVE                      :: r_readlast
+	  INTEGER, PARAMETER              :: i_flowdims= 4
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_u
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_v
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_w
+	  CHARACTER (LEN=32)              :: c_prfix, c_pofix
+!---------- These are the exported routines
+	  PUBLIC :: slm_windfield, slm_windinit, slm_windquit
+	  CONTAINS
+!*****************************************************************
+	  FUNCTION slm_windfield(r_coord, r_time) RESULT (r_field)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  INCLUDE 'netcdf.inc'
+
+	  REAL, DIMENSION(GRID_dimension), INTENT(in) :: r_coord
+	  REAL, INTENT(in), OPTIONAL                  :: r_time
+	  REAL, DIMENSION(GRID_dimension)             :: r_field
+	  REAL                                        :: r_tim
+	  INTEGER                                     :: i_cnt, j_cnt
+	  INTEGER                                     :: i_zcnt, i_iost, i_type
+	  INTEGER                                     :: i_numdim, i_atts, &
+	                                                 i_ioend, i_ioncin
+	  INTEGER, DIMENSION(NF_MAX_VAR_DIMS)         :: i_dim, i_strt, &
+	                                                 i_vardim, i_count
+	  CHARACTER (LEN=66)                          :: c_name, c_tmp
+	  CHARACTER (len=io_fillen)                   :: c_vname
+
+!---------- set time
+
+	  IF(present(r_time)) THEN
+	    r_tim= r_time
+	  ELSE
+	    r_tim= 0.0
+	  END IF
+
+!---------- decide, if data has to be updated
+
+	  data_update: IF(r_readlast <= r_tim) THEN
+
+!---------- set indices for data array
+
+	    i_curhour= i_curhour+ 1
+	    new_read: IF(i_curhour > i_maxhour) THEN
+	    i_curhour= 1
+	    i_strt= 1
+
+!---------- create filenames
+
+	    write(c_name,1000) trim(c_prfix),i_curday,adjustl(c_pofix)
+	    c_name= adjustl(c_name)
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) 'INFO: Opening File: ', c_name
+
+!---------- open wind data file
+
+	    i_iost= nf_open(c_name, NF_NOWRITE, i_ioncin)
+	    file_notopen: IF(i_iost /= NF_NOERR) THEN
+	      write(i_ioerr,*) 'ERROR: Filename: ', c_name
+	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'ERROR: Filename: ', c_name
+	      CALL grid_error(c_error='[slm_windfield]: Could not open NetCDF file')
+	    END IF file_notopen
+
+!---------- inquire wind data file: number of variables
+
+	    i_iost= nf_inq_nvars(i_ioncin, i_vars)
+	    IF(i_vars /= 3) CALL grid_error(c_error='[slm_windfield]: Invalid NetCDF file, with more than 3 wind field variables')
+
+!---------- inquire wind data file: number of defined dimensions
+
+	    i_iost= nf_inq_ndims(i_ioncin, i_numdim)
+	    IF(i_iost /= NF_NOERR) CALL grid_error(c_error='[slm_windfield]: Could not inquire dimensions!')
+
+!---------- inquire dimension lengths
+
+	    DO i_cnt=1,i_numdim
+	      i_iost= nf_inq_dim(i_ioncin, i_cnt, c_vname, i_vardim(i_cnt))
+	    END DO
+
+	    DO i_cnt=1,i_vars
+	      i_iost= nf_inq_var(i_ioncin, i_cnt, c_vname, i_type, i_numdim, i_dim, i_atts)
+	      IF(i_type /= NF_REAL) THEN
+	        CALL grid_error(c_error='[slm_windfield]: Invalid data type for wind field')
+	      END IF
+	      IF(i_numdim < i_flowdims) THEN
+	        CALL grid_error(c_error='[slm_windfield]: Invalid number of wind field dimensions (should be 5: x, y, z, hour, day)')
+	      END IF
+	      IF(i_cnt == 1) THEN
+	        i_nx     = i_vardim(i_dim(1))
+	        i_ny     = i_vardim(i_dim(2))
+	        i_nz     = i_vardim(i_dim(3))
+	        i_maxhour= i_vardim(i_dim(4))
+	        IF(.NOT. ALLOCATED(r_u)) THEN
+		  ALLOCATE(r_u(i_nx, i_ny, i_nz, i_maxhour), stat=i_iost)
+	          IF(i_iost /= 0) THEN
+	            CALL grid_error(c_error='[slm_windfield]: Could not allocate u wind field array!')
+	          END IF
+	        END IF
+	        i_count(1:4)= i_vardim(i_dim(1:4))
+	        i_iost= nf_get_vara_real(i_ioncin, i_cnt, i_strt(1:4), i_count(1:4), r_u)
+	        IF(i_iost /= NF_NOERR) THEN
+	          CALL grid_error(c_error='[slm_windfield]: Could not read u wind field array!')
+	        END IF
+	      END IF
+	      IF(i_cnt == 2) THEN
+	        IF(i_vardim(i_dim(1)) /= i_nx) CALL grid_error(c_error='[slm_windfield]: Invalid number of x-values in v wind field array!')
+	        IF(i_vardim(i_dim(2)) /= i_ny) CALL grid_error(c_error='[slm_windfield]: Invalid number of y-values in v wind field array!')
+	        IF(i_vardim(i_dim(3)) /= i_nz) CALL grid_error(c_error='[slm_windfield]: Invalid number of z-values in v wind field array!')
+	        IF(i_vardim(i_dim(4)) /= i_maxhour) CALL grid_error(c_error='[slm_windfield]: Invalid number of hours in v wind field array!')
+	        IF(.NOT. ALLOCATED(r_v)) THEN
+	          ALLOCATE(r_v(i_nx, i_ny, i_nz, i_maxhour), stat=i_iost)
+	          IF(i_iost /= 0) THEN
+	            CALL grid_error(c_error='[slm_windfield]: Could not allocate v wind field array!')
+	          END IF
+	        END IF
+	        i_count(1:4)= i_vardim(i_dim(1:4))
+	        i_iost= nf_get_vara_real(i_ioncin, i_cnt, i_strt(1:4), i_count(1:4), r_v)
+	        IF(i_iost /= NF_NOERR) THEN
+	          CALL grid_error(c_error='[slm_windfield]: Could not read v wind field array!')
+	        END IF
+	      END IF
+	      IF(i_cnt == 3) THEN
+	        IF(i_vardim(i_dim(1)) /= i_nx) CALL grid_error(c_error='[slm_windfield]: Invalid number of x-values in w wind field array!')
+	        IF(i_vardim(i_dim(2)) /= i_ny) CALL grid_error(c_error='[slm_windfield]: Invalid number of y-values in w wind field array!')
+	        IF(i_vardim(i_dim(3)) < i_nz) CALL grid_error(c_error='[slm_windfield]: Invalid number of z-values in w wind field array!')
+	        IF(i_vardim(i_dim(4)) /= i_maxhour) CALL grid_error(c_error='[slm_windfield]: Invalid number of hours in w wind field array!')
+	        IF(.NOT. ALLOCATED(r_w)) THEN
+	          ALLOCATE(r_w(i_nx, i_ny, i_vardim(i_dim(3)), i_maxhour), stat=i_iost)
+	          IF(i_iost /= 0) THEN
+	            CALL grid_error(c_error='[slm_windfield]: Could not allocate w wind field array!')
+	          END IF
+	        END IF
+	        i_count(1:4)= i_vardim(i_dim(1:4))
+	        i_iost= nf_get_vara_real(i_ioncin, i_cnt, i_strt(1:4), i_count(1:4), r_w)
+	        IF(i_iost /= NF_NOERR) THEN
+	          CALL grid_error(c_error='[slm_windfield]: Could not read w wind field array!')
+	        END IF
+	      END IF
+	    END DO
+
+!---------- close wind data file
+
+	    i_iost= nf_close(i_ioncin)
+	    IF(i_iost /= NF_NOERR) THEN
+	      CALL grid_error(c_error='[slm_windfield]: Could not close NetCDF file...')
+	    END IF
+	    IF(GRID_parameters%iolog > 0) &
+	    write(GRID_parameters%iolog,*) 'INFO: Closed File: ', c_name
+
+	    END IF new_read
+
+!---------- update values for next update
+
+	    r_readlast   = r_readlast+ r_tslen
+
+	  END IF data_update
+
+!---------- interpolate to coordinate
+
+	  r_field= data_interpol(r_coord)
+
+ 1000	  FORMAT(a32,i2.2,a32)
+	  RETURN
+	  END FUNCTION slm_windfield
+
+!*****************************************************************
+	  SUBROUTINE slm_windinit(p_control)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  
+	  INCLUDE 'netcdf.inc'
+
+	  TYPE (control_struct)     :: p_control
+	  
+	  CHARACTER (len=io_fillen) :: c_name
+	  INTEGER                   :: i_iofil= 19
+	  INTEGER                   :: i_iost
+	  CHARACTER (len=io_fillen) :: c_vname
+	  CHARACTER (LEN=66)        :: c_ncname
+	  CHARACTER (len=80)        :: a_filrow
+	  INTEGER                   :: i_cnt, i_type, i_numdim, i_atts, &
+	                               i_ioend, i_ioncin
+	  INTEGER, DIMENSION(NF_MAX_VAR_DIMS) :: i_dim, i_strt, i_vardim, i_count
+
+!---------- initialize
+
+	  c_name= p_control%io%c_windfile
+	  c_prfix= '                                '
+	  c_pofix= '                                '
+
+!---------- open wind parameter file
+
+	  open(unit= i_iofil, file= c_name, status= 'OLD', action= 'READ', iostat= i_iost)
+	  file_notopen: IF(i_iost /= 0) THEN
+	    write(i_ioerr,*) 'ERROR: Filename: ', c_name
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) 'ERROR: Filename: ', c_name
+	    CALL grid_error(c_error='[slm_windinit]: Could not open wind parameters file')
+	  END IF file_notopen
+	  IF(GRID_parameters%iolog > 0) &
+	    write(GRID_parameters%iolog,*) 'INFO: Opened file on unit: ', i_iofil
+
+!---------- read wind parameter file
+
+	  read_loop: DO
+	    read(i_iofil,2000,iostat=i_ioend) a_filrow
+
+!---------- if file ended
+
+	    file_end: IF(i_ioend /= 0) THEN
+	      close(i_iofil)
+	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'INFO: Closed file on unit: ', i_iofil
+	      EXIT read_loop
+	    ELSE file_end
+
+!---------- decide what to DO with line according to first character
+
+	      comment_line: IF(a_filrow(1:1) == '#' .or. a_filrow(1:1) == '!') THEN
+	        CONTINUE
+	      ELSE IF(a_filrow(1:11) == 'FILE_PREFIX') THEN comment_line
+	        read(i_iofil,2010) c_prfix
+	      ELSE IF(a_filrow(1:11) == 'FILE_POSTFI') THEN comment_line
+	        read(i_iofil,2010) c_pofix
+	      ELSE IF(a_filrow(1:11) == 'NUMBER_OF_D') THEN comment_line
+	        read(i_iofil,*) i_maxday
+	      END IF comment_line
+	    END IF file_end
+	  END DO read_loop
+
+!---------- open first file for data
+
+	  write(c_ncname,1000) trim(c_prfix),adjustl(c_pofix)
+	  c_ncname= adjustl(c_ncname)
+
+!---------- open wind data file
+
+	  i_iost= nf_open(c_ncname, NF_NOWRITE, i_ioncin)
+	  ncfile_notopen: IF(i_iost /= NF_NOERR) THEN
+	    write(i_ioerr,*) 'ERROR: Filename: ', c_ncname
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) 'ERROR: Filename: ', c_ncname
+	    CALL grid_error(c_error='[slm_windinit]: Could not open NetCDF file')
+	  END IF ncfile_notopen
+
+!---------- inquire wind data file: number of defined dimensions
+
+	  i_iost= nf_inq_ndims(i_ioncin, i_numdim)
+	  IF(i_iost /= NF_NOERR) CALL grid_error(c_error='[slm_windinit]: Could not inquire dimensions!')
+
+!---------- inquire dimension lengths, we want to know the number of hours/day
+
+	  i_curhour= 0
+	  DO i_cnt=1,i_numdim
+	    i_iost= nf_inq_dim(i_ioncin, i_cnt, c_vname, i_vardim(i_cnt))
+	    IF(c_vname(1:2) == 'ih') i_curhour= i_vardim(i_cnt)
+	  END DO
+	  IF(i_curhour == 0) THEN
+	    CALL grid_error(c_error='[slm_windinit]: Something is wrong with the data, 0 hours/day encountered')
+	  END IF
+
+!---------- close wind data file
+
+	  i_iost= nf_close(i_ioncin)
+	  IF(i_iost /= NF_NOERR) THEN
+	    CALL grid_error(c_error='[slm_windinit]: Could not close NetCDF file...')
+	  END IF
+
+!---------- initialize some values
+
+	  r_tslen= 24.0/REAL(i_curhour)* 3600.0 ! data time step length in seconds
+	  i_curday= 1
+	  i_curhour= 0
+	  r_readlast= 0.0
+	  r_z  = (/ 25.0, 50.0, 150.0, 300.0, 500.0, 800.0, 1200.0, 1800.0, 2500.0, 3000.0 /)
+	  r_dz = (/ 25.0, 25.0, 100.0, 150.0, 200.0, 300.0, 400.0, 600.0, 700.0, 500.0 /)
+	  r_dzi= 1./r_dz
+
+ 2000	  FORMAT(a80)
+ 2010	  FORMAT(a32)
+ 1000	  FORMAT(a32,'01',a32)
+	  RETURN
+	  END SUBROUTINE slm_windinit
+
+!*****************************************************************
+	  SUBROUTINE slm_windquit
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  
+	  IF(ALLOCATED(r_u)) DEALLOCATE(r_u)
+	  IF(ALLOCATED(r_v)) DEALLOCATE(r_v)
+	  IF(ALLOCATED(r_w)) DEALLOCATE(r_w)
+
+	  RETURN
+	  END SUBROUTINE slm_windquit
+
+!*****************************************************************
+	  FUNCTION data_interpol(r_coord) RESULT (r_inter)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL, DIMENSION(GRID_dimension) :: r_coord
+	  REAL, DIMENSION(GRID_dimension) :: r_inter
+	  INTEGER                         :: i_lox, i_hix, i_loy, i_hiy, &
+	    i_loz, i_hiz, i_cnt
+	  REAL                            :: r_lz, r_hz, r_lx, r_hx, &
+	    r_ly, r_hy, r_l1, r_h1, r_l2, r_h2, r_l3, r_h3
+	  REAL                            :: r_xu1, r_xu2, r_xu3, r_xu4, &
+	    r_xv1, r_xv2, r_xv3, r_xv4, r_xw1, r_xw2, r_xw3, r_xw4, &
+	    r_yu1, r_yu2, r_yv1, r_yv2, r_yw1, r_yw2
+
+!---------- find wind box corresponding to coordinate
+
+	  i_lox= FLOOR(r_coord(1)*r_dxi)
+	  i_loy= FLOOR(r_coord(2)*r_dyi)
+!-- preliminary bug fix
+	  IF(i_lox < 1) i_lox=1
+	  IF(i_lox >= i_nx) i_lox= i_nx-1
+	  IF(i_loy < 1) i_loy=1
+	  IF(i_loy >= i_ny) i_loy= i_ny-1
+!-- end of preliminary bug fix
+	  i_hix= i_lox+ 1
+	  i_hiy= i_loy+ 1
+!-- z-coordinate is not equidistant
+	  i_loz= 0
+	  DO i_cnt=i_nz,1,-1
+	    IF(r_coord(3) <= r_z(i_cnt)) i_loz= i_cnt-1
+	  END DO
+	  IF(i_loz < 1) i_loz= 1
+	  IF(i_loz >= i_nz) i_loz= i_nz-1
+	  i_hiz= i_loz+ 1
+
+!---------- calculate weights for bilinear interpolation
+
+	  r_lx= r_coord(1) - (r_dx* REAL(i_lox-1))
+	  IF(i_lox == 1) r_lx= r_coord(1)
+	  r_ly= r_coord(2) - (r_dy* REAL(i_loy-1))
+	  IF(i_loy == 1) r_ly= r_coord(2)
+	  r_lz= r_coord(3) - r_z(i_loz)
+	  IF(i_loz == 1) r_lz= r_coord(3)
+	  r_hx= (r_dx* REAL(i_hix-1)) - r_coord(1)
+	  r_hy= (r_dy* REAL(i_hiy-1)) - r_coord(2)
+	  r_hz= r_z(i_hiz) - r_coord(3)
+
+!---------- linear interpolation in x-direction
+
+	  r_xu1= (r_hx* r_u(i_lox, i_loy, i_loz, i_curhour)+ &
+	          r_lx* r_u(i_hix, i_loy, i_loz, i_curhour))* r_dxi
+	  r_xu2= (r_hx* r_u(i_lox, i_hiy, i_loz, i_curhour)+ &
+	          r_lx* r_u(i_hix, i_hiy, i_loz, i_curhour))* r_dxi
+	  r_xu3= (r_hx* r_u(i_lox, i_loy, i_hiz, i_curhour)+ &
+	          r_lx* r_u(i_hix, i_loy, i_hiz, i_curhour))* r_dxi
+	  r_xu4= (r_hx* r_u(i_lox, i_hiy, i_hiz, i_curhour)+ &
+	          r_lx* r_u(i_hix, i_hiy, i_hiz, i_curhour))* r_dxi
+
+	  r_xv1= (r_hx* r_v(i_lox, i_loy, i_loz, i_curhour)+ &
+	          r_lx* r_v(i_hix, i_loy, i_loz, i_curhour))* r_dxi
+	  r_xv2= (r_hx* r_v(i_lox, i_hiy, i_loz, i_curhour)+ &
+	          r_lx* r_v(i_hix, i_hiy, i_loz, i_curhour))* r_dxi
+	  r_xv3= (r_hx* r_v(i_lox, i_loy, i_hiz, i_curhour)+ &
+	          r_lx* r_v(i_hix, i_loy, i_hiz, i_curhour))* r_dxi
+	  r_xv4= (r_hx* r_v(i_lox, i_hiy, i_hiz, i_curhour)+ &
+	          r_lx* r_v(i_hix, i_hiy, i_hiz, i_curhour))* r_dxi
+
+	  r_xw1= (r_hx* r_w(i_lox, i_loy, i_loz+1, i_curhour)+ &
+	          r_lx* r_w(i_hix, i_loy, i_loz+1, i_curhour))* r_dxi
+	  r_xw2= (r_hx* r_w(i_lox, i_hiy, i_loz+1, i_curhour)+ &
+	          r_lx* r_w(i_hix, i_hiy, i_loz+1, i_curhour))* r_dxi
+	  r_xw3= (r_hx* r_w(i_lox, i_loy, i_hiz+1, i_curhour)+ &
+	          r_lx* r_w(i_hix, i_loy, i_hiz+1, i_curhour))* r_dxi
+	  r_xw4= (r_hx* r_w(i_lox, i_hiy, i_hiz+1, i_curhour)+ &
+	          r_lx* r_w(i_hix, i_hiy, i_hiz+1, i_curhour))* r_dxi
+
+!---------- linear interpolation in y-direction
+
+	  r_yu1= (r_hy* r_xu1+ r_ly* r_xu2)* r_dyi
+	  r_yu2= (r_hy* r_xu3+ r_ly* r_xu4)* r_dyi
+
+	  r_yv1= (r_hy* r_xv1+ r_ly* r_xv2)* r_dyi
+	  r_yv2= (r_hy* r_xv3+ r_ly* r_xv4)* r_dyi
+
+	  r_yw1= (r_hy* r_xw1+ r_ly* r_xw2)* r_dyi
+	  r_yw2= (r_hy* r_xw3+ r_ly* r_xw4)* r_dyi
+
+!---------- linear interpolation in z-direction
+
+	  r_inter(1)= (r_hz* r_yu1+ r_lz* r_yu2)* r_dzi(i_loz)
+	  r_inter(2)= (r_hz* r_yv1+ r_lz* r_yv2)* r_dzi(i_loz)
+	  r_inter(3)= (r_hz* r_yw1+ r_lz* r_yw2)* r_dzi(i_loz)
+
+	  RETURN
+	  END FUNCTION data_interpol
+
+!*****************************************************************
+!	  FUNCTION dist(r_coo1, r_coo2) RESULT (r_dist)
+
+!---------- local declarations
+
+!	  IMPLICIT NONE
+!	  REAL, DIMENSION(2) :: r_coo1, r_coo2
+!	  REAL               :: r_dist
+!	  REAL               :: r_d1, r_d2
+
+!---------- calculate distance between the two
+
+!	  r_d1= (r_coo1(1)- r_coo2(1))
+!	  r_d2= (r_coo1(2)- r_coo2(2))
+!	  r_dist= sqrt((r_d1*r_d1+ r_d2*r_d2))
+
+!	  RETURN
+!	  END FUNCTION dist
+
+!*****************************************************************
+	END MODULE ADV_wind

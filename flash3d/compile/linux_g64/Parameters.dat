@@ -1,0 +1,72 @@
+#-----------------------------------------------------------
+# Input file for batch mode input
+# input is controlled via keywords
+#
+# j. behrens 12/96
+#-----------------------------------------------------------
+# the experiment no. (0 for a new experiment)     [integer]
+EXPERIMENT_NUMBER
+0
+# desired maximum level of refinements            [integer]
+FINE_GRID_LEVEL
+17
+# minimum level of refinements                    [integer]
+COARSE_GRID_LEVEL
+8
+# tolerance for refinement                        [real]
+TOLERANCE_OF_REFINEMENT
+0.003
+# tolerance for coarsening                        [real]
+TOLERANCE_OF_COARSENING
+0.001
+# watermark for refinement                        [real]
+WATERMARK_OF_REFINEMENT
+0.0001
+# watermark for coarsening                        [real]
+WATERMARK_OF_COARSENING
+0.0001
+# timestep length                                 [real]
+TIMESTEP_LENGTH
+600.
+# first timestep                                  [integer]
+BEGINNING_TIMESTEP
+1
+# last timestep                                   [integer]
+FINISHING_TIMESTEP
+60
+# plot in matlab style to file (no plot = 0)      [integer]
+MATLAB_PLOTTING
+0
+# plot in gmv style to file (no plot = 0)         [integer]
+GMV_FILE_PLOTTING
+1
+# plot in VisNET window (no plot = 0)             [integer]
+VISNET_PLOTTING
+1
+# screenshot VisNET window (no plot = 0)          [integer]
+VISNET_SCREENSHOT
+1
+# timesteps between plots                         [integer]
+STEPS_BTW_PLOTS
+1
+# timesteps between saves                         [integer]
+STEPS_BTW_SAVES
+500
+# save last timestep for next experiment (no = 0) [integer]
+SAVE_FINISH_CONFIGURATION
+0
+# take advecting wind from file (if given)        [character]
+WIND_FILE_NAME
+Windparam.dat
+# file defining the domain                        [character]
+DOMAIN_FILE_NAME
+Domain.dat
+# file defining the initial triangulation         [character]
+TRIANG_FILE_NAME
+Triang.dat
+# number of iterations in trajectory estimation   [integer]
+SLM_ITERATION_NUMBER
+4
+#-----------------------------------------------------------
+# END OF FILE
+#-----------------------------------------------------------

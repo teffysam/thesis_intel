@@ -1,0 +1,23 @@
+**************************************************************************
+
+ amatos
+ adaptive mesh generator for atmospheric and oceanic simulations
+
+**************************************************************************
+
+ CONTENTS OF THIS DIRECTORY "$(AMATOSDIR)/data"
+
+Parameters.dat	- Sample parameter file
+README		- this file
+Triang.dat	- Sample initial triangulation
+
+--------------------------------------------------------------------------
+
+DESCRIPTION:
+
+A triangulation of the unit sphere, starting from a football (cut icosahedron)
+is created.
+
+**************************************************************************
+ j. behrens, 11/00
+**************************************************************************

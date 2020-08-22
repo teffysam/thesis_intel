@@ -1,0 +1,57 @@
+Reihenfolge der Array-Indices in C/C++
+
+Beitrag von U. Göbel: C and C++ interface to netcdf (version 3.3.1):
+
+With using the C or C++ interface to netcdf there often arises the question in
+which order the data of multidimensional arrays is returned by calls to
+functions like
+ 
+        nc_get_varx_type(...,type * data)
+
+where x is in {1, s, a, , m} and type in {float,double, ....}. The natural
+order returned by the netcdf interface is with the last dimensions varying
+fastest.  E.g. if temperature is a 3 dimensional array of type float
+temperature[5][6][4] then a call like nc_get_varx_float(....,temp_arr) returns
+the data in float *temp_arr in the form 
+
+      { [0][0][0], [0][0][1], [0][0][2], ..... ,[0][0][4],
+        [0][1][0], [0][1][1], [0][1][2], ..... ,[0][1][4],
+        [0][2][0], [0][2][1], [0][2][2], ..... ,[0][2][4],
+        .
+        .
+        .
+        [1][0][0], [1][0][1], [1][0][2], ......,[1][0][4]
+        .
+        .
+        [5][6][0], [5][6][1],[5][6][2], ......,[5][6][4]
+        }
+
+        nc_get_varm_type( int ncid, int varid,const size_t *startp,
+        const size_t *countp, const ptrdiff_t *stridep,
+        const ptrdiff_t *imapp, const float *op);
+
+Instead of giving a detailed explanation of mapping I will simply show how to
+specify reverse order: If your multidimensional array has d dimensions with
+length dim1, dim2, ..., dimd (e.g. float
+temperature[dim1][dim2][dim3]...[dimd]) specify a d dimensional vector imapp of
+type ptrdiff_t (defined in stddef.h usually an unsigned int or long) with the
+following entries: 
+
+        ptrdiff_t imapp[d]={1, dim1, dim1*dim2, dim1*dim2*dim3, ..., dim1*dim2*dim3*...*dim(d-1)}
+
+(Note that the last dimension dimd does not appear anywhere.) Unfortunately the
+C++ interface does not implement the mapped access, so you have to rely on the
+C interface (which is automatically included in netcdf.hh). Using the NcFile
+and NcVar classes the access could look like this: 
+
+   NcFile *NcFile;
+   NcVar *NcVar;
+   int num_of_var;
+   
+   NcFile = new NcFile("myfile");
+   NcVar = NcFile->get_var(num_of_var);
+   
+   nc_get_varm_float(NcFile->id(),NcVar->id(),start,counts,stride,imap,data);
+
+For further explanation of mapped access refer to the netcdf manual sections
+3.2.3, 7.9 and 7.14 (not very elucidating).  

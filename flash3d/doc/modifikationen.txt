@@ -1,0 +1,126 @@
+
+Stand 14.10.99
+
+Ziemlich viel ausprobiert habe ich an folgenden routinen/funktionen 
+
+
+*) FEM_interpolation.f90, function estmt_gradient
+   
+   Schleife neu strukturiert (gute "ubung, um datenstrukturen und
+   vorgehensweisen nachzuvollziehen), pointer-zuweisungen ersetzt
+   durch direktes rausschreiben der ben"otigeten daten.
+
+   Performancegewinn durch bessere cachenutzung und eingesparte 
+   operationen (gilt auch f"ur andere routinen, siehe unten. Effekt 
+   auf der t3e deutlich. Das ging so schritt f"ur schritt, ich muss
+   mal mit der originalversion vergleichen. W"urde sch"atzen, das
+   ganze modell ist jetzt in etwa doppelt so schnell.)
+
+
+*) GRID_api.f90, function grid_domaincheck
+	
+   Ebenfalls: direktes "ubernehmen der daten statt pointer. 	
+
+
+*) FEM_utils.f90, function in_out
+
+   Pointer: s.o.  Die berechnung der vier dreiecksfl"achen ist
+   zusammengefasst, um rechenoperationen zu sparen. (Kein aufruf von
+   dcalc_area mehr)  
+   Alternativ (auskommentiert): entscheidung durch vergleich punkt
+   links-rechts bzgl aller dreiecksseiten (Das klappt, wenn man bei
+   der urspr. triangulierung darauf achtet, alle kanten von elementen
+   gegen den urzeigersinn anzugeben. Der gittergenerator erh"alt diese
+   eigenschaft) 
+
+
+*) GRID_api.f90, function grid_coordvalue
+
+   Hier wird zu anfang gecheckt, ob der punkt im inneren des gebietes
+  liegt (grid_domaincheck). Bei aufruf von slm_interpolate aus ist die
+  antwort aber bereits bekannt, grid_domaincheck zuvor aufgerufen
+  worden. Also: ist das ergebnis bekannt, kann es grid_coordvalue
+  "ubergeben werden.
+
+  SLM_interpolation.f90,  subroutine slm_interpolate,
+  SLM_interpolation.clip, subroutine slm_interpolate
+
+  Aufruf von grid_coordvalue entsprechend erg"anzt.
+
+
+*) FEM_utils.f90, function edge_intersect
+   (auf englisch, weil ich irgendwann angefangen habe, meinen
+   schmierzettel-file auf englisch zu schreiben)
+
+   Check, wether the nodes of the boundary edge lay on the same side
+   of the line r_check--r_outer => no intersection. In the same way:
+   r_check, r_outer on the same side of the boundary edge => no
+   intersection. 
+
+   These tests can easily be performed by calculating the
+   crossproducts. If they are of equal sign => same side => no
+   intersection. 
+                       X
+                        \
+   A________________B    \
+                          \
+                           Y
+
+   crossproducts (B-A)x(X-A)  (B-A)x(Y-A) have different sign => X, Y on
+   different sides of A--B  => intersection possible
+
+   crossproducts (Y-X)x(B-X)  (Y-X)x(A-X)  have equal sign => A, B on the 
+   same side of X--Y  => no intersection
+
+   Remark: If (and only if !) one of these crossproducts is equal (close
+   to) zero, we have a degenerate case. Using this information, the
+   following calculations can be simplified.	
+
+
+
+*) FEM_gridmanag.f90, FUNCTION grid_findelement
+
+   Loop restructered, less pointers.
+   Less calls to in_out in the hierarchical search: If the point belongs
+   to the parent element, it also has to belong to one of the
+   children. Therefore, it is sufficient to test all children except of
+   one.  
+
+
+*) FEM_saveset.f90, subroutine grid_readdomain 
+   FEM_inittriang.f90, grid_create
+   Domain.dat, Triang.dat
+
+   Reduced format for input of the triangulation. 
+
+   Im beispielfile Triang.dat ist eine triangulierung f"ur ein quadrat
+   mit quadratischer insel beschrieben.
+ ______________          Redundante daten werden jetzt berechnet, es reicht,
+ |\    /\    /|          die knoten mit koordinaten,
+ | \  /  \  / |          die kanten mit zugeh. knoten und randbedg,
+ |  \/___ \/  |          die elemente mit kanten (gegen den uhrzeiger) und
+ |  /|    |\  |                           markierten kanten
+ | / |    | \ |          zeilenweise einzugeben.
+ |/  |    |  \|
+ |\  |    |  /|          Sobald es wirklich kompliziert wird, ist es
+ | \ |    | / |          so viieel angenehmer.
+ |  \|____|/  |
+ |  /\    /\  |    
+ | /  \  /  \ |
+ |/____\/____\|
+
+	
+   Die grafik-schnittstelle weiss mit der insel nix anzufange. Zugleich 
+ist sie bisher die einzige, die den berandenden polygonzug
+braucht. Also gibt's in Domain.dat einfach nur den "ausseren rand.
+
+
+F"ur landmasken ist wahrscheinlich eine bitmap am einfachsten zu
+handhaben... und auch nicht ungenauer, als ein polygonzug, den man in
+endlicher zeit eingeben kann. Mal ein bischen gr"ubeln und
+ausprobieren.
+
+
+
+
+

@@ -1,0 +1,746 @@
+!*****************************************************************
+!
+! MODULE NAME:
+!	ADV_wind
+! FUNCTION:
+!	calculate the windfield for the advection problem
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_windfield
+! FUNCTION:
+!	calculate the advecting force for simple advection
+! SYNTAX:
+!	real.arr= slm_windfield(real.arr, real)
+! ON INPUT:
+!	r_coord: coordinates of point		real
+!	r_time:  time coordinate (optional)	real
+! ON OUTPUT:
+!	r_field: windfield			real
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! PUBLIC:
+!
+! COMMENTS:
+!
+! USES:
+!	MISC_globalparam, MISC_error
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	12/97
+!	2. bug fix concerning interp.	j. behrens	2/98
+!	3. compliant to amatos 1.0	j. behrens	12/2000
+!
+!*****************************************************************
+	MODULE ADV_wind
+	  USE GRID_api
+	  PRIVATE
+	  INTEGER, PARAMETER :: i_ioerr=0
+	  REAL :: r_intervalfac, r_scalfacx, r_scalfacy, r_readlast, &
+	          r_scalinvx, r_scalinvy
+	  CHARACTER (LEN=32) :: c_prfixx, c_prfixy, c_pofixx, c_pofixy
+	  REAL, DIMENSION(:,:), ALLOCATABLE :: r_flowx
+	  REAL, DIMENSION(:,:), ALLOCATABLE :: r_flowy
+	  INTEGER :: i_pointsx, i_pointsy, i_intervallen, i_intervalups, i_intervalnum
+	  PUBLIC :: slm_windfield, slm_windinit, slm_windquit
+	  CONTAINS
+!*****************************************************************
+	  FUNCTION slm_windfield(r_coord, r_time) RESULT (r_field)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  REAL, DIMENSION(GRID_dimension), INTENT(in) :: r_coord
+	  REAL, INTENT(in), OPTIONAL                  :: r_time
+	  REAL, DIMENSION(GRID_dimension)             :: r_field
+	  REAL                                        :: r_tim
+	  CHARACTER (LEN=67)                          :: c_xfile, c_yfile
+	  CHARACTER (LEN=35)                          :: c_tmp
+	  CHARACTER (LEN=3)                           :: c_num
+	  INTEGER,PARAMETER                           :: i_iowx=21
+	  INTEGER,PARAMETER                           :: i_iowy=23
+	  INTEGER                                     :: i_iost, i_cnt, j_cnt
+
+!---------- set time
+
+	  IF(present(r_time)) THEN
+	    r_tim= r_time
+	  ELSE
+	    r_tim= 0.0
+	  END IF
+
+!---------- decide, if data has to be read
+
+	  data_read: IF(r_readlast <= r_tim) THEN
+
+!---------- create filenames
+
+	    write(c_num,1000) i_intervalnum
+	    write(c_tmp,*) trim(c_prfixx),c_num
+	    write(c_xfile,*) trim(c_tmp), c_pofixx
+	    c_xfile= adjustl(c_xfile)
+	    write(c_tmp,*) trim(c_prfixy),c_num
+	    write(c_yfile,*) trim(c_tmp), c_pofixy
+	    c_yfile= adjustl(c_yfile)
+
+!---------- open files
+
+	    open(unit= i_iowx, file= c_xfile, status= 'OLD', action= 'READ', iostat= i_iost)
+	    xfile_notopen: IF(i_iost /= 0) THEN
+	      write(i_ioerr,*) 'ERROR: Filename: ', c_xfile
+	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'ERROR: Filename: ', c_xfile
+	      CALL grid_error(30)
+	    END IF xfile_notopen
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) '[slm_windfield]: opened Filename: ', c_xfile, ' on unit: ', i_iowx
+
+	    open(unit= i_iowy, file= c_yfile, status= 'OLD', action= 'READ', iostat= i_iost)
+	    yfile_notopen: IF(i_iost /= 0) THEN
+	      write(i_ioerr,*) 'ERROR: Filename: ', c_yfile
+	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'ERROR: Filename: ', c_yfile
+	      CALL grid_error(30)
+	    END IF yfile_notopen
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) '[slm_windfield]: opened Filename: ', c_yfile, ' on unit: ', i_iowy
+
+!---------- read wind data
+
+	    read(i_iowx,*) ((r_flowx(i_cnt, j_cnt), i_cnt=1,i_pointsx), j_cnt=1,i_pointsy)
+	    read(i_iowy,*) ((r_flowy(i_cnt, j_cnt), i_cnt=1,i_pointsx), j_cnt=1,i_pointsy)
+
+!---------- close files
+
+	    close(i_iowx)
+	    close(i_iowy)
+
+!---------- update values for next open
+
+	    r_readlast   = r_readlast+ r_intervalfac* i_intervallen
+	    i_intervalnum= i_intervalnum+ i_intervallen
+	  END IF data_read
+
+!---------- interpolate to coordinate
+
+	  r_field= data_interpol(r_coord)
+!	  r_field= data_qinterpol(r_coord)
+!	  r_field= data_qlinterpol(r_coord)
+
+	  RETURN
+ 1000	  FORMAT(i3.3)
+	  END FUNCTION slm_windfield
+
+!*****************************************************************
+	  SUBROUTINE slm_windinit(p_control)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (control_struct)     :: p_control
+	  INTEGER                   :: i_iofil= 19
+	  CHARACTER (len=io_fillen) :: c_name
+	  CHARACTER (len=80)        :: a_filrow
+	  INTEGER                   :: i_iost, i_ioend, i_alct
+
+!---------- initialize
+
+	  c_name= p_control%io%c_windfile
+	  c_prfixx= '                                '
+	  c_pofixx= '                                '
+	  c_prfixy= '                                '
+	  c_pofixy= '                                '
+
+!---------- open wind parameter file
+
+	  open(unit= i_iofil, file= c_name, status= 'OLD', action= 'READ', iostat= i_iost)
+	  file_notopen: IF(i_iost /= 0) THEN
+	    write(i_ioerr,*) 'ERROR: Filename: ', c_name
+	    IF(GRID_parameters%iolog > 0) &
+	      write(GRID_parameters%iolog,*) 'ERROR: Filename: ', c_name
+	    CALL grid_error(31)
+	  END IF file_notopen
+	  IF(GRID_parameters%iolog > 0) &
+	    write(GRID_parameters%iolog,*) 'INFO: Opened file on unit: ', i_iofil
+
+!---------- read wind parameter file
+
+	  read_loop: DO
+	    read(i_iofil,2000,iostat=i_ioend) a_filrow
+
+!---------- if file ended
+
+	    file_end: IF(i_ioend /= 0) THEN
+	      close(i_iofil)
+	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'INFO: Closed file on unit: ', i_iofil
+	      EXIT read_loop
+	    ELSE file_end
+
+!---------- decide what to DO with line according to first character
+
+	    comment_line: IF(a_filrow(1:1) == '#' .or. a_filrow(1:1) == '!') THEN
+	      CONTINUE
+	    ELSE IF(a_filrow(1:8) == 'X_PREFIX') THEN comment_line
+	      read(i_iofil,2010) c_prfixx
+	    ELSE IF(a_filrow(1:8) == 'Y_PREFIX') THEN comment_line
+	      read(i_iofil,2010) c_prfixy
+	    ELSE IF(a_filrow(1:8) == 'X_POSTFI') THEN comment_line
+	      read(i_iofil,2010) c_pofixx
+	    ELSE IF(a_filrow(1:8) == 'Y_POSTFI') THEN comment_line
+	      read(i_iofil,2010) c_pofixy
+	    ELSE IF(a_filrow(1:8) == 'X_NUMBER') THEN comment_line
+	      read(i_iofil,*) i_pointsx
+	    ELSE IF(a_filrow(1:8) == 'Y_NUMBER') THEN comment_line
+	      read(i_iofil,*) i_pointsy
+	    ELSE IF(a_filrow(1:8) == 'X_SCALE_') THEN comment_line
+	      read(i_iofil,*) r_scalfacx
+	    ELSE IF(a_filrow(1:8) == 'Y_SCALE_') THEN comment_line
+	      read(i_iofil,*) r_scalfacy
+	    ELSE IF(a_filrow(1:8) == 'NUMBER_O') THEN comment_line
+	      read(i_iofil,*) i_intervallen
+	    ELSE IF(a_filrow(1:8) == 'UPSET_OF') THEN comment_line
+	      read(i_iofil,*) i_intervalups
+	    ELSE IF(a_filrow(1:8) == 'TIME_FAC') THEN comment_line
+	      read(i_iofil,*) r_intervalfac
+	    END IF comment_line
+
+	    END IF file_end
+	  END DO read_loop
+
+!---------- allocate wind data arrays
+
+	  IF(allocated(r_flowx)) deallocate(r_flowx)
+	  IF(allocated(r_flowy)) deallocate(r_flowy)
+	  allocate(r_flowy(i_pointsx, i_pointsy), &
+	           r_flowx(i_pointsx, i_pointsy), &
+	           stat= i_alct)
+	  IF(i_alct /= 0) THEN
+	    CALL grid_error(32)
+	  END IF
+
+!---------- initialize some values
+
+	  r_readlast= 0.0
+	  i_intervalnum= i_intervalups
+	  r_scalinvx= 1.0/ r_scalfacx
+	  r_scalinvy= 1.0/ r_scalfacy
+
+	  RETURN
+ 2000	  FORMAT(a80)
+ 2010	  FORMAT(a32)
+	  END SUBROUTINE slm_windinit
+
+!*****************************************************************
+	  SUBROUTINE slm_windquit
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+!---------- deallocate wind data arrays
+
+	  DEALLOCATE(r_flowx, r_flowy)
+
+	  RETURN
+	  END SUBROUTINE slm_windquit
+
+!*****************************************************************
+	  FUNCTION data_interpol(r_coord) RESULT (r_inter)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL, DIMENSION(GRID_dimension) :: r_coord
+	  REAL, DIMENSION(GRID_dimension) :: r_inter
+	  INTEGER                         :: i_lox, i_hix, i_loy, i_hiy
+	  REAL                            :: r_dx, r_dy, r_lx, r_hx, &
+	    r_ly, r_hy, r_l1, r_h1, r_l2, r_h2, r_dxi, r_dyi
+
+!---------- find wind box corresponding to coordinate
+
+	  i_lox= FLOOR(r_coord(1))
+	  i_loy= FLOOR(r_coord(2))
+!-- preliminary bug fix
+	  IF(i_lox < 1) i_lox=1
+	  IF(i_lox >= i_pointsx) i_lox= i_pointsx-1
+	  IF(i_loy < 1) i_loy=1
+	  IF(i_loy >= i_pointsy) i_loy= i_pointsy-1
+!-- end of preliminary bug fix
+	  i_hix= i_lox+ 1
+	  i_hiy= i_loy+ 1
+
+!---------- calculate weights for bilinear interpolation
+
+	  r_dx= REAL(i_hix- i_lox)
+	  r_dy= REAL(i_hiy- i_loy)
+	  r_lx= r_coord(1) - REAL(i_lox)
+	  r_ly= r_coord(2) - REAL(i_loy)
+	  r_hx= REAL(i_hix) - r_coord(1)
+	  r_hy= REAL(i_hiy) - r_coord(2)
+
+!---------- linear interpolation in x-direction
+
+	  IF(r_dx /= 0) THEN
+	    r_dxi= 1./r_dx
+	    r_l1= (r_hx* r_flowx(i_lox, i_loy)+ &
+	           r_lx* r_flowx(i_hix, i_loy))* r_dxi
+	    r_h1= (r_hx* r_flowx(i_lox, i_hiy)+ &
+	           r_lx* r_flowx(i_hix, i_hiy))* r_dxi
+	    r_l2= (r_hx* r_flowy(i_lox, i_loy)+ &
+	           r_lx* r_flowy(i_hix, i_loy))* r_dxi
+	    r_h2= (r_hx* r_flowy(i_lox, i_hiy)+ &
+	           r_lx* r_flowy(i_hix, i_hiy))* r_dxi
+	  ELSE
+	    r_l1= r_flowx(i_lox, i_loy)
+	    r_h1= r_flowx(i_lox, i_hiy)
+	    r_l2= r_flowy(i_lox, i_loy)
+	    r_h2= r_flowy(i_lox, i_hiy)
+	  END IF
+
+!---------- linear interpolation in y-direction
+
+	  IF(r_dy /= 0) THEN
+	    r_dyi= 1./r_dy
+	    r_inter(1)= (r_hy* r_l1+ r_ly* r_h1)* r_dyi* r_scalinvx
+	    r_inter(2)= (r_hy* r_l2+ r_ly* r_h2)* r_dyi* r_scalinvy
+	  ELSE
+	    r_inter(1)= r_l1* r_scalinvx
+	    r_inter(2)= r_l2* r_scalinvy
+	  END IF
+
+	  RETURN
+	  END FUNCTION data_interpol
+
+!*****************************************************************
+	  FUNCTION data_qinterpol(r_coord) RESULT (r_inter)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL, DIMENSION(GRID_dimension) :: r_coord
+	  REAL, DIMENSION(GRID_dimension) :: r_inter
+	  INTEGER                         :: i_lox, i_hix, i_loy, i_hiy, i_mdx, i_mdy
+	  REAL                            :: r_cx, r_cy
+	  REAL, DIMENSION(3)              :: r_u, r_v, r_x, r_y
+	  REAL                            :: r_err
+	  REAL                            :: r_ep, r_eps
+
+!---------- determine machine precision
+
+	  r_ep= 1.0
+	  r_eps= epsilon(r_ep)
+
+!---------- find wind box corresponding to coordinate
+
+	  i_lox= FLOOR(r_coord(1))
+	  i_loy= FLOOR(r_coord(2))
+!-- preliminary bug fix
+	  IF(i_lox < 1) i_lox=1
+	  IF(i_lox >= i_pointsx) i_lox= i_pointsx-2
+	  IF(i_loy < 1) i_loy=1
+	  IF(i_loy >= i_pointsy) i_loy= i_pointsy-2
+!-- end of preliminary bug fix
+	  i_mdx= i_lox+ 1
+	  i_mdy= i_loy+ 1
+	  i_hix= i_lox+ 2
+	  i_hiy= i_loy+ 2
+
+!---------- near the domain boundary, do a linear interpolation (only for square)
+
+	  IF(i_lox < 2 .OR. i_loy < 2 .OR. i_hix > i_pointsx-1 .OR. i_hiy > i_pointsy-1) THEN
+	    r_inter= data_interpol(r_coord)
+	    RETURN
+	  END IF
+
+!---------- coefficients for quadratic interpolation in x
+
+	  r_cx= r_coord(1)
+	  r_cy= r_coord(2)
+
+	  r_x= (/ REAL(i_lox), REAL(i_mdx), REAL(i_hix) /)
+	  r_y= (/ REAL(i_loy), REAL(i_mdy), REAL(i_hiy) /)
+
+!---------- check for coordinate identity in x
+
+	  IF(abs(r_cx- r_x(1)) < r_eps) THEN
+	    r_u= (/ r_flowx(i_lox, i_loy), r_flowx(i_lox, i_mdy), r_flowx(i_lox, i_hiy) /)
+	    r_v= (/ r_flowy(i_lox, i_loy), r_flowy(i_lox, i_mdy), r_flowy(i_lox, i_hiy) /)
+	  ELSE IF(abs(r_cx- r_x(2)) < r_eps) THEN
+	    r_u= (/ r_flowx(i_mdx, i_loy), r_flowx(i_mdx, i_mdy), r_flowx(i_mdx, i_hiy) /)
+	    r_v= (/ r_flowy(i_mdx, i_loy), r_flowy(i_mdx, i_mdy), r_flowy(i_mdx, i_hiy) /)
+	  ELSE IF(abs(r_cx- r_x(3)) < r_eps) THEN
+	    r_u= (/ r_flowx(i_hix, i_loy), r_flowx(i_hix, i_mdy), r_flowx(i_hix, i_hiy) /)
+	    r_v= (/ r_flowy(i_hix, i_loy), r_flowy(i_hix, i_mdy), r_flowy(i_hix, i_hiy) /)
+	  ELSE
+
+!---------- quadratic interpolation in x
+
+	    r_u(1)= poly_1d(2, r_x, &
+	            (/ r_flowx(i_lox, i_loy), r_flowx(i_mdx, i_loy), r_flowx(i_hix, i_loy) /), &
+	            r_cx, r_err)
+	    r_u(2)= poly_1d(2, r_x, &
+	            (/ r_flowx(i_lox, i_mdy), r_flowx(i_mdx, i_mdy), r_flowx(i_hix, i_mdy) /), &
+	            r_cx, r_err)
+	    r_u(3)= poly_1d(2, r_x, &
+	            (/ r_flowx(i_lox, i_hiy), r_flowx(i_mdx, i_hiy), r_flowx(i_hix, i_hiy) /), &
+	            r_cx, r_err)
+
+	    r_v(1)= poly_1d(2, r_x, &
+	            (/ r_flowy(i_lox, i_loy), r_flowy(i_mdx, i_loy), r_flowy(i_hix, i_loy) /), &
+	            r_cx, r_err)
+	    r_v(2)= poly_1d(2, r_x, &
+	            (/ r_flowy(i_lox, i_mdy), r_flowy(i_mdx, i_mdy), r_flowy(i_hix, i_mdy) /), &
+	            r_cx, r_err)
+	    r_v(3)= poly_1d(2, r_x, &
+	            (/ r_flowy(i_lox, i_hiy), r_flowy(i_mdx, i_hiy), r_flowy(i_hix, i_hiy) /), &
+	            r_cx, r_err)
+	 END IF
+
+!---------- check for coordinate identity in y
+
+	  IF(abs(r_cy- r_y(1)) < r_eps) THEN
+	    r_inter(1)= r_u(1)* r_scalinvx
+	    r_inter(2)= r_v(1)* r_scalinvy
+	  ELSE IF(abs(r_cy- r_y(2)) < r_eps) THEN
+	    r_inter(1)= r_u(2)* r_scalinvx
+	    r_inter(2)= r_v(2)* r_scalinvy
+	  ELSE IF(abs(r_cy- r_y(3)) < r_eps) THEN
+	    r_inter(1)= r_u(3)* r_scalinvx
+	    r_inter(2)= r_v(3)* r_scalinvy
+	  ELSE
+
+!---------- quadratic interpolation in y
+
+	    r_inter(1)= poly_1d(2, r_y, r_u, r_cy, r_err)* r_scalinvx
+	    r_inter(2)= poly_1d(2, r_y, r_v, r_cy, r_err)* r_scalinvy
+	  END IF
+
+	  RETURN
+	  END FUNCTION data_qinterpol
+
+!*****************************************************************
+	  FUNCTION data_qlinterpol(r_coord) RESULT (r_inter)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL, DIMENSION(GRID_dimension) :: r_coord
+	  REAL, DIMENSION(GRID_dimension) :: r_inter
+	  INTEGER                         :: i_lox, i_hix, i_loy, i_hiy, i_mdx, i_mdy
+	  REAL                            :: r_x, r_y, r_x1, r_x2, r_x3, &
+	    r_y1, r_y2, r_y3, r_u1, r_u2, r_u3, r_v1, r_v2, r_v3
+	  REAL                            :: r_ep, r_eps
+
+!---------- determine machine precision
+
+	  r_ep= 1.0
+	  r_eps= epsilon(r_ep)
+
+!---------- find wind box corresponding to coordinate
+
+	  i_lox= FLOOR(r_coord(1))
+	  i_loy= FLOOR(r_coord(2))
+!-- preliminary bug fix
+	  IF(i_lox < 1) i_lox=1
+	  IF(i_lox >= i_pointsx) i_lox= i_pointsx-2
+	  IF(i_loy < 1) i_loy=1
+	  IF(i_loy >= i_pointsy) i_loy= i_pointsy-2
+!-- end of preliminary bug fix
+	  i_mdx= i_lox+ 1
+	  i_mdy= i_loy+ 1
+	  i_hix= i_lox+ 2
+	  i_hiy= i_loy+ 2
+
+!---------- near the domain boundary, do a linear interpolation (only for square)
+
+	  IF(i_lox < 2 .OR. i_loy < 2 .OR. i_hix > i_pointsx-1 .OR. i_hiy > i_pointsy-1) THEN
+	    r_inter= data_interpol(r_coord)
+	    RETURN
+	  END IF
+
+!---------- coefficients for quadratic interpolation in x
+
+	  r_x= r_coord(1)
+	  r_y= r_coord(2)
+
+	  r_x1= REAL(i_lox)
+	  r_x2= REAL(i_mdx)
+	  r_x3= REAL(i_hix)
+
+	  r_y1= REAL(i_loy)
+	  r_y2= REAL(i_mdy)
+	  r_y3= REAL(i_hiy)
+
+!---------- check for coordinate identity in x
+
+	  IF(abs(r_x- r_x1) < r_eps) THEN
+	    r_u1= r_flowx(i_lox, i_loy)
+	    r_u2= r_flowx(i_lox, i_mdy)
+	    r_u3= r_flowx(i_lox, i_hiy)
+	    r_v1= r_flowy(i_lox, i_loy)
+	    r_v2= r_flowy(i_lox, i_mdy)
+	    r_v3= r_flowy(i_lox, i_hiy)
+	  ELSE IF(abs(r_x- r_x2) < r_eps) THEN
+	    r_u1= r_flowx(i_mdx, i_loy)
+	    r_u2= r_flowx(i_mdx, i_mdy)
+	    r_u3= r_flowx(i_mdx, i_hiy)
+	    r_v1= r_flowy(i_mdx, i_loy)
+	    r_v2= r_flowy(i_mdx, i_mdy)
+	    r_v3= r_flowy(i_mdx, i_hiy)
+	  ELSE IF(abs(r_x- r_x3) < r_eps) THEN
+	    r_u1= r_flowx(i_hix, i_loy)
+	    r_u2= r_flowx(i_hix, i_mdy)
+	    r_u3= r_flowx(i_hix, i_hiy)
+	    r_v1= r_flowy(i_hix, i_loy)
+	    r_v2= r_flowy(i_hix, i_mdy)
+	    r_v3= r_flowy(i_hix, i_hiy)
+	  ELSE
+
+!---------- quadratic interpolation in x
+
+	    r_u1= lagrange(r_x, r_x1, r_x2, r_x3, &
+	          r_flowx(i_lox, i_loy), r_flowx(i_mdx, i_loy), r_flowx(i_hix, i_loy))
+	    r_u2= lagrange(r_x, r_x1, r_x2, r_x3, &
+	          r_flowx(i_lox, i_mdy), r_flowx(i_mdx, i_mdy), r_flowx(i_hix, i_mdy))
+	    r_u3= lagrange(r_x, r_x1, r_x2, r_x3, &
+	          r_flowx(i_lox, i_hiy), r_flowx(i_mdx, i_hiy), r_flowx(i_hix, i_hiy))
+
+	    r_v1= lagrange(r_x, r_x1, r_x2, r_x3, &
+	          r_flowy(i_lox, i_loy), r_flowy(i_mdx, i_loy), r_flowy(i_hix, i_loy))
+	    r_v2= lagrange(r_x, r_x1, r_x2, r_x3, &
+	          r_flowy(i_lox, i_mdy), r_flowy(i_mdx, i_mdy), r_flowy(i_hix, i_mdy))
+	    r_v3= lagrange(r_x, r_x1, r_x2, r_x3, &
+	          r_flowy(i_lox, i_hiy), r_flowy(i_mdx, i_hiy), r_flowy(i_hix, i_hiy))
+	  END IF
+
+!---------- check for coordinate identity in y
+
+	  IF(abs(r_y- r_y1) < r_eps) THEN
+	    r_inter(1)= r_u1* r_scalinvx
+	    r_inter(2)= r_v1* r_scalinvy
+	  ELSE IF(abs(r_y- r_y2) < r_eps) THEN
+	    r_inter(1)= r_u2* r_scalinvx
+	    r_inter(2)= r_v2* r_scalinvy
+	  ELSE IF(abs(r_y- r_y3) < r_eps) THEN
+	    r_inter(1)= r_u3* r_scalinvx
+	    r_inter(2)= r_v3* r_scalinvy
+	  ELSE
+
+!---------- quadratic interpolation in y
+
+	    r_inter(1)= lagrange(r_y, r_y1, r_y2, r_y3, r_u1, r_u2, r_u3)* r_scalinvx
+	    r_inter(2)= lagrange(r_y, r_y1, r_y2, r_y3, r_v1, r_v2, r_v3)* r_scalinvy
+	  END IF
+
+	  RETURN
+	  END FUNCTION data_qlinterpol
+
+!*****************************************************************
+	  FUNCTION lagrange(r_x, r_x1, r_x2, r_x3, r_y1, r_y2, r_y3) RESULT (r_y)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL :: r_x, r_x1, r_x2, r_x3, r_y, r_y1, r_y2, r_y3
+	  REAL :: r_d12, r_d23, r_d13, r_dx1, r_dx2, r_dx3
+
+!---------- calculate differences
+
+	  r_d12= r_x1- r_x2
+	  r_d13= r_x1- r_x3
+	  r_d23= r_x2- r_x3
+
+	  r_dx1= r_x- r_x1
+	  r_dx2= r_x- r_x2
+	  r_dx3= r_x- r_x3
+
+!---------- calculate lagrangian
+
+	  r_y= (r_dx2* r_dx3)/( r_d12*  r_d13)* r_y1+ &
+	       (r_dx1* r_dx3)/(-r_d12*  r_d23)* r_y2+ &
+	       (r_dx1* r_dx2)/(-r_d13* (-r_d23))* r_y3
+	  
+	  RETURN
+	  END FUNCTION lagrange
+
+!*****************************************************************
+	  FUNCTION solv_3x3(r_mat, r_rhs, i_err) RESULT (r_sol)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL, DIMENSION(3,3) :: r_mat
+	  REAL, DIMENSION(3)   :: r_rhs, r_sol
+	  INTEGER              :: i_err
+	  INTEGER              :: i_cnt, j_cnt, l_cnt, i_ind
+	  REAL                 :: r_tmp, r_fac, r_caf
+
+!---------- set error flag
+
+	  i_err= 0
+
+!---------- do the lr decomposition
+
+	  lr_outer: DO i_cnt=1,2
+
+!---------- perform pivoting
+
+	    pivot: IF(r_mat(i_cnt,i_cnt) == 0.0) THEN
+	      i_ind= i_cnt+ 1
+	      IF(r_mat(i_ind,i_cnt) == 0.0) i_ind= MIN(i_cnt+2,3)
+	      IF(r_mat(i_ind,i_cnt) == 0.0) THEN
+	        i_err= -1
+	        r_sol= 0.0
+	        RETURN
+	      END IF
+	      pivot_inner: DO j_cnt=1,3
+	        r_tmp             = r_mat(i_cnt,j_cnt)
+	        r_mat(i_cnt,j_cnt)= r_mat(i_ind,j_cnt)
+	        r_mat(i_ind,j_cnt)= r_tmp
+	      END DO pivot_inner
+	      r_tmp       = r_rhs(i_cnt)
+	      r_rhs(i_cnt)= r_rhs(i_ind)
+	      r_rhs(i_ind)= r_tmp
+	    END IF pivot
+
+!---------- now the elimination
+
+	    r_fac= 1.0/ r_mat(i_cnt,i_cnt)
+	    lr_middle: DO j_cnt= i_cnt+1,3
+	      r_caf= r_mat(j_cnt,i_cnt)* r_fac
+	      r_rhs(j_cnt)= r_rhs(j_cnt)- r_rhs(i_cnt)* r_caf
+	      lr_inner: DO l_cnt= i_cnt+1,3
+	        r_mat(j_cnt,l_cnt)= r_mat(j_cnt,l_cnt)- r_mat(i_cnt,l_cnt)* r_caf
+	      END DO lr_inner
+	    END DO lr_middle
+	  END DO lr_outer
+
+!---------- do the backward substitution
+
+	  r_sol(3)= r_sol(3)/ r_mat(3,3)
+	  subst_outer: DO i_cnt=2,1,-1
+	    r_fac= 1.0/ r_mat(i_cnt,i_cnt)
+	    r_sol(i_cnt)= r_rhs(i_cnt)* r_fac
+	    subst_inner: DO j_cnt=i_cnt+1,3
+	      r_sol(i_cnt)= r_sol(i_cnt)- r_sol(j_cnt)* r_mat(i_cnt,j_cnt)* r_fac
+	    END DO subst_inner
+	  END DO subst_outer
+
+	  RETURN
+	  END FUNCTION solv_3x3
+
+!*****************************************************************
+	  FUNCTION qfunc(r_coo, r_coe) RESULT (r_val)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  REAL               :: r_coo, r_val
+	  REAL, DIMENSION(3) :: r_coe
+
+!---------- evaluate quadratic function
+
+	  r_val= r_coo* r_coo* r_coe(1)+ r_coo* r_coe(2)+ r_coe(3)
+
+	  RETURN
+	  END FUNCTION qfunc
+!*****************************************************************
+	  FUNCTION poly_1d(i_ord, r_xi, r_yi, r_coo, r_dy) RESULT (r_val)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  INTEGER                  :: i_ord
+	  REAL, DIMENSION(:)       :: r_xi, r_yi
+	  REAL                     :: r_coo, r_dy, r_val
+	  REAL                     :: r_dif, r_dift, r_ho, r_hp, r_w, r_den, r_eps, r_ep
+	  INTEGER                  :: i_ns, i_cnt, j_cnt
+	  INTEGER, PARAMETER       :: i_mxord=5
+	  REAL, DIMENSION(i_mxord) :: r_c, r_d
+
+!---------- 
+
+	  IF(i_ord >= i_mxord) THEN
+	    CALL grid_error(33)
+	  END IF
+
+!	  r_ep= 1.0
+!	  r_eps= epsilon(r_ep)
+
+	  i_ns= 1
+	  r_dif= abs(r_coo- r_xi(1))
+
+	  DO i_cnt= 1, i_ord+ 1
+	    r_dift= abs(r_coo- r_xi(i_cnt))
+	    IF(r_dift < r_eps) THEN
+	      r_val= r_yi(i_cnt)
+	      RETURN
+	    END IF
+	    IF(r_dift < r_dif) THEN
+	      i_ns= i_cnt
+	      r_dif= r_dift
+	    END IF
+	    r_c(i_cnt)= r_yi(i_cnt)
+	    r_d(i_cnt)= r_yi(i_cnt)
+	  END DO
+
+	  r_val= r_yi(i_ns)
+	  i_ns= i_ns- 1
+
+	  DO j_cnt= 1, i_ord
+	    DO i_cnt= 1, i_ord+1-j_cnt
+	      r_ho= r_xi(i_cnt)- r_coo
+	      r_hp= r_xi(i_cnt+j_cnt)- r_coo
+	      r_w= r_c(i_cnt+1)- r_d(i_cnt)
+	      r_den= r_ho- r_hp
+	      IF(r_den == 0.0) THEN
+	        CALL grid_error(34)
+	      END IF
+	      r_den= r_w/ r_den
+	      r_d(i_cnt)= r_hp* r_den
+	      r_c(i_cnt)= r_ho* r_den
+	    END DO
+
+	    IF(2*i_ns < i_ord+1-j_cnt) THEN
+	      r_dy= r_c(i_ns+1)
+	    ELSE
+	      r_dy= r_d(i_ns)
+	      i_ns= i_ns- 1
+	    END IF
+	    r_val= r_val+ r_dy
+	  END DO
+
+	  RETURN
+	  END FUNCTION poly_1d
+!*****************************************************************
+!	  FUNCTION dist(r_coo1, r_coo2) RESULT (r_dist)
+
+!---------- local declarations
+
+!	  IMPLICIT NONE
+!	  REAL, DIMENSION(2) :: r_coo1, r_coo2
+!	  REAL               :: r_dist
+!	  REAL               :: r_d1, r_d2
+
+!---------- calculate distance between the two
+
+!	  r_d1= (r_coo1(1)- r_coo2(1))
+!	  r_d2= (r_coo1(2)- r_coo2(2))
+!	  r_dist= sqrt((r_d1*r_d1+ r_d2*r_d2))
+
+!	  RETURN
+!	  END FUNCTION dist
+
+!*****************************************************************
+	END MODULE ADV_wind

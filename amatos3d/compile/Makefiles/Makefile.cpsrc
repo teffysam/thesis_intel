@@ -1,0 +1,64 @@
+FEM_basis.f90: $(GRIDDIR)/FEM_basis.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_basis.f90 .
+FEM_create.f90: $(GRIDDIR)/FEM_create.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_create.f90 .
+FEM_dataretrieve.f90: $(GRIDDIR)/FEM_dataretrieve.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_dataretrieve.f90 .
+FEM_define.f90: $(GRIDDIR)/FEM_define.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_define.f90 .
+FEM_gridgen.f90: $(GRIDDIR)/FEM_gridgen.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_gridgen.f90 .
+FEM_gridmanag.f90: $(GRIDDIR)/FEM_gridmanag.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_gridmanag.f90 .
+FEM_handle.f90: $(GRIDDIR)/FEM_handle.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_handle.f90 .
+FEM_inittriang.f90: $(GRIDDIR)/FEM_inittriang.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_inittriang.f90 .
+FEM_interpolation.f90: $(GRIDDIR)/FEM_interpolation.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_interpolation.f90 .
+FEM_param.F90: $(GRIDDIR)/FEM_param.F90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_param.F90 .
+FEM_saveset.f90: $(GRIDDIR)/FEM_saveset.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_saveset.f90 .
+FEM_utils.f90: $(GRIDDIR)/FEM_utils.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/FEM_utils.f90 .
+GRID_api.f90: $(GRIDDIR)/GRID_api.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/GRID_api.f90 .
+MISC_error.f90: $(GRIDDIR)/MISC_error.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/MISC_error.f90 .
+MISC_globalparam.f90: $(GRIDDIR)/MISC_globalparam.f90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/MISC_globalparam.f90 .
+MISC_utils.F90: $(GRIDDIR)/MISC_utils.F90
+	$(CP) $(CPFLAGS) $(GRIDDIR)/MISC_utils.F90 .
+
+QSHEP3D.f: $(GRIDDIR)/QSHEP3D.f
+	$(CP) $(CPFLAGS) $(GRIDDIR)/QSHEP3D.f .
+Amatos3d.f90: $(TSTDIR)/Amatos3d.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/Amatos3d.f90 .
+ERROR_est.f90: $(TSTDIR)/ERROR_est.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/ERROR_est.f90 .
+IO_gmvplot.f90: $(TSTDIR)/IO_gmvplot.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/IO_gmvplot.f90 .
+IO_gnuplot.f90: $(TSTDIR)/IO_gnuplot.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/IO_gnuplot.f90 .
+IO_matlabplot.f90: $(TSTDIR)/IO_matlabplot.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/IO_matlabplot.f90 .
+IO_utils.f90: $(TSTDIR)/IO_utils.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/IO_utils.f90 .
+MAIN_parameters.f90: $(TSTDIR)/MAIN_parameters.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/MAIN_parameters.f90 .
+MISC_functions.f90: $(TSTDIR)/MISC_functions.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/MISC_functions.f90 .
+MISC_poisson.f90: $(TSTDIR)/MISC_poisson.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/MISC_poisson.f90 .
+MISC_datafun.f90: $(TSTDIR)/MISC_datafun.f90
+	$(CP) $(CPFLAGS) $(TSTDIR)/MISC_datafun.f90 .
+
+
+MISC_system.f90: $(SYSDIR)/MISC_system.f90
+	$(CP) $(CPFLAGS) $(SYSDIR)/MISC_system.f90 .
+MISC_wrapper.c: $(SYSDIR)/MISC_wrapper.c
+	$(CP) $(CPFLAGS) $(SYSDIR)/MISC_wrapper.c .
+
+MISC_timing.f90: $(TIMDIR)/MISC_timing.f90
+	$(CP) $(CPFLAGS) $(TIMDIR)/MISC_timing.f90 .

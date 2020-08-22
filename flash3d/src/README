@@ -1,0 +1,17 @@
+**************************************************************************
+ FLASH90
+ FLexible Adaptive Semi-Lagrangian Hack
+ written in Fortran 90
+
+**************************************************************************
+
+ CONTENTS OF THIS DIRECTORY "$(FLASHDIR)/src"
+
+README			- this file
+flash			- directory for the FLASH sources
+system			- directory for system dependent routines
+utils			- directory for utility programs
+
+**************************************************************************
+ j. behrens, 5/01
+**************************************************************************

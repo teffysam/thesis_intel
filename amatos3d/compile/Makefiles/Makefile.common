@@ -1,0 +1,162 @@
+#------------------------------------------------------------------------#
+# +--------------------------------------------------------------------+ #
+# | common stuff (this file must be included from individual Makefile) | #
+# +--------------------------------------------------------------------+ #
+#------------------------------------------------------------------------#
+
+#----------------------------------------------------------------#
+# OBJECTS                                                        #
+#----------------------------------------------------------------#
+SEROBJ = \
+QSHEP3D.o \
+FEM_param.o \
+FEM_define.o \
+MISC_globalparam.o \
+MISC_error.o \
+MISC_utils.o \
+FEM_handle.o \
+FEM_basis.o 
+ifeq ($(strip $(IO_EMIT)),yes)
+ SEROBJ += IO_emit_c.o
+endif
+SEROBJ += \
+FEM_utils.o \
+FEM_create.o \
+FEM_gridmanag.o \
+FEM_gridgen.o \
+FEM_inittriang.o \
+FEM_interpolation.o \
+FEM_saveset.o \
+FEM_dataretrieve.o \
+GRID_api.o
+ifeq ($(strip $(SYSTEM)),gfortran)
+  SEROBJ += MISC_wrapper.o
+endif
+
+
+# -------- include additional Macros ----------------------------#
+FFLAGS += $(MACROS:%=$(MF)%)
+CFLAGS += $(MACROS:%=$(MF)%)
+
+
+#----------------------------------------------------------------#
+# COMPILE STEP (CONVENTIONS)                                     #
+#----------------------------------------------------------------#
+
+.SUFFIXES: .c .f90 .F90 .F .f $(SUFFIXES)
+
+.F90.o:
+	@echo "make: Building object module from "$<
+	$(F90) $(FFLAGS) $(AMATFLAG) $(INCPATH) -c $<
+
+.f90.o:
+	@echo "make: Building object module from "$<
+	$(F90) $(FFLAGS) $(AMATFLAG) $(INCPATH) -c $<
+
+.f.o:
+	@echo "make: Building object module from "$<
+	$(F90) $(FFLAGS) $(AMATFLAG) $(INCPATH) -c $<
+
+.c.o:
+	@echo "make: Building object module from "$<
+	$(cc) $(CFLAGS) $(AMATFLAG) $(INCPATH_CC) -D$(MACHINE) -c $<
+
+.C.o:
+	@echo "make: Building object module from "$<
+	$(CC) $(CFLAGS) $(AMATFLAG) $(INCPATH_CC) -D$(MACHINE) -c $<
+
+
+#----------------------------------------------------------------#
+# MAKE EVERYTHING (CREATE THE EXECUTABLE, INSTALL, CLEAN UP)     #
+#----------------------------------------------------------------#
+
+all: lib $(MAKETHING) #datacopy #test
+
+
+#----------------------------------------------------------------#
+# THIS CREATES THE GRID GENERATOR LIBRARIES                      #
+#----------------------------------------------------------------#
+
+$(GRIDLIB): $(SEROBJ)
+	@echo "make: Creating an archive from object modules"
+	$(AR) $(ARFLAGS) $(GRIDLIB) $(SEROBJ)
+
+gridcopy:
+	$(CP) $(CPFLAGS) $(GRIDDIR)/*.F90 .
+	$(CP) $(CPFLAGS) $(GRIDDIR)/*.C   .
+
+gridclear:
+	@$(MAKE) clearsrc
+	@rm -f *.o core
+
+grid: $(GRIDLIB) $(GRDSLIB)
+
+lib: grid install
+
+
+#----------------------------------------------------------------#
+# THIS INSTALLS THE GRID GENERATOR LIBRARIES                     #
+#----------------------------------------------------------------#
+
+installlib: $(LIBDIR)/$(GRIDLIB)
+$(LIBDIR)/$(GRIDLIB): $(GRIDLIB)
+	@echo "make: Installing library in lib directory"
+	cp $(GRIDLIB) $(LIBDIR)
+
+installslib: $(LIBDIR)/$(GRDSLIB)
+$(LIBDIR)/$(GRDSLIB): $(GRDSLIB)
+	@echo "make: Installing shared library in lib directory"
+	cp $(GRDSLIB) $(LIBDIR)
+
+installmod:
+	@echo "make: Installing module file in include directory"
+	cp $(GRDMOD) $(INCDIR)
+
+install: installlib installmod installslib 
+
+uninstall:
+	rm -f $(LIBDIR)/$(GRIDLIB)
+	rm -f $(LIBDIR)/$(GRDSLIB)
+	rm -f $(INCDIR)/$(GRDMOD)
+
+#----------------------------------------------------------------#
+# THIS CREATES THE MAIN PROGRAM                                  #
+#----------------------------------------------------------------#
+
+maincopy:
+	cp $(TSTDIR)/*.*90 .
+	cp $(SYSDIR)/*.f90 .
+	cp $(TIMDIR)/*.f90 .
+	cp $(TSTDIR)/*.c   .
+
+$(MAKETHING): $(OBJMAIN)
+	@echo "make: Linking object modules and libraries"
+	$(LOADER) $(LDFLAGS) -o $(MAKETHING) $(OBJMAIN) $(SHLIBPATH) $(LIBS)
+
+executable: $(MAKETHING)
+
+
+#----------------------------------------------------------------#
+# CLEAN UP							 #
+#----------------------------------------------------------------#
+# use ..._EXT macros for definition of extras to be cleared/cleaned
+# e.g. SAVETHING, data files , ...
+
+clearsrc:
+	rm -f *.f90 *.F90 *.h *.C *.c *.f *.F $(CLEARSRC_EXT)
+
+clearex:
+	rm -f $(MAKETHING) $(GRIDLIB) $(GRDSLIB) $(CLEAREX_EXT)
+
+cleardat:
+	rm -f $(MAKETHING)_* *.dat *.ftf $(CLEARDAT_EXT)
+
+clearlib:
+	rm -f $(LIBDIR)/$(GRIDLIB)  $(LIBDIR)/$(GRDSLIB) $(INCDIR)/$(GRDMOD) $(CLEARLIB_EXT)
+
+clean:
+	rm -f *.o *.$(MODEND) core so_locations $(GRIDLIB) $(GRDSLIB) $(CLEAN_EXT)
+
+tidy: clean clearex clearsrc cleardat
+	rm -f $(TIDY_EXT)
+

@@ -1,0 +1,24 @@
+**************************************************************************
+ FLASH90
+ FLexible Adaptive Semi-Lagrangian Hack
+ written in Fortran 90
+
+**************************************************************************
+
+ CONTENTS OF THIS DIRECTORY "$(FLASHDIR)/data"
+
+README		- this file
+PotsdamInput	- Directory containing specially taylored data files
+Domain.dat	- Domain description data file
+Triang.dat	- Initial triangulation data file
+
+
+--------------------------------------------------------------------------
+
+ WHAT TO DO HERE:
+ 
+nothing. just leave this directory untouched for further reference :-)
+
+**************************************************************************
+ j. behrens, 3/99
+**************************************************************************

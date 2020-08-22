@@ -1,0 +1,21 @@
+!-------------------------------------------------------------------------
+! WindNetCDF.dat
+! this file contains data for the processing of wind data given in 
+! NetCDF files as used in the Berlin data set.
+!
+! j. behrens, 01/2004
+!-------------------------------------------------------------------------
+# we assume data file names of the form
+#   FILE_PREFIXnnFILE_POSTFIX
+# where nn is the number of the day (from 1 to NUMBER_OF_DAYS)
+# here we read the prefix/postfix for the file
+FILE_PREFIX
+3D_Wind_Oct01
+FILE_POSTFIX
+.cdf
+# the no. of days corresponds to the no. of files
+NUMBER_OF_DAYS
+31
+!-------------------------------------------------------------------------
+! END OF FILE
+!-------------------------------------------------------------------------

@@ -1,0 +1,314 @@
+#!/bin/sh
+
+
+#Basic settings and initialization
+
+paramfile="./param.dat"
+
+grid_coarse=""
+grid_fine=""
+method=""
+timestep_finish=""
+wind=""
+
+diagnostics=""
+output_file=""
+gmv_plot="0"
+help=""
+
+# read existing Parameters.dat and set values
+# to be done in a later version
+
+
+# set parameters given at prompt
+# values like wind and method depend on the settings in the Makefile for FLASH3D
+if (test -n "$1"); then
+  while (test -n "$1"); do
+    case "$1" in 
+  	  -gc) 
+		  if (test -n "$2"); then
+		    grid_coarse="$2"
+		    shift
+		  else
+		    help="1"
+		  fi;;
+	  -gf)
+		  if (test -n "$2"); then
+		    grid_fine="$2"
+		    shift
+		  else
+		    help="1"
+		  fi;;
+	  -m)	
+		  if (test -n "$2"); then
+		    case "$2" in 
+			  Plain)
+				  method="Plain";;
+			  "CW"|"Dual")
+				  method="Dual";;
+			  MPSLM)
+				  method="$2";;
+			  "Quad"|"Quadrature")
+				  method="Quadrature";;
+			  Analytic)
+				  method="$2";;
+			  *)
+				  help="1";;
+		    esac	
+		    shift
+		  else
+		    help="1"
+		  fi;;
+	  -t)
+		  if (test -n "$2"); then
+		    timestep_finish="$2"
+		    shift
+		  else
+		    help="1"
+		  fi;;
+	  -w)	
+		  if (test -n "$2"); then
+		    case "$2" in
+		  	  CircWind)
+		  		  wind="$2";;
+			  ConvWind)
+				  wind="$2";;
+			  DiagWind)
+				  wind="$2";;
+			  Kaeser)
+				  wind="$2";;
+			  *)
+				  help="1";;
+		    esac
+		    shift
+		  else
+		    help="1"
+		  fi;;
+	  -d)	
+		  diagnostics="1";;
+	  -gmv)
+		  gmv_plot="1";;
+	  -o)
+		  output_file="1";;
+	  "-?"|"--help"|"-help")
+		  help="1";;
+	  *)
+		  echo "unknown option: "$1
+		  exit ;;
+    esac
+    shift
+  done
+else
+  help="1"  
+fi
+
+# for debugging only
+#echo "gc:"$grid_coarse
+#echo "gf:"$grid_fine
+#echo "t:"$timestep_finish
+#echo "m:"$method
+#echo "w:"$wind
+
+if (test -z "$grid_coarse") || (test -z "$grid_fine") || (test -z "$timestep_finish") || (test -z "$method") || (test -z "$wind"); then
+   help="1"
+fi
+
+#Some help wanted?
+
+if (test -n "$help"); then
+  echo "-------------------------------------"
+  echo "  runFLASH Version 0.1-3D"
+  echo "  by Lars Mentrup 2004"
+  echo "-------------------------------------"
+  echo
+  echo "Script to run FLASH3D automatically." 
+  echo "1. Creates user defined Parameters file corresponding to given Parameters."
+  echo "2. Compiles the given method and wind into FLASH3D executable."
+  echo "3. Runs FLASH3D with the created Parameters file."
+  echo "4. Renames the outputfiles (gmv,matlab,diagnosis,out) to a [method_wind_coarse-grid_fine-grid]"
+  echo "   specific name."
+  echo
+  echo "Specify the following options:"
+  echo
+  echo "  Essential parameters:"
+  echo -e "   -gc #          \t\t Coarse grid level"
+  echo -e "   -gf #          \t\t Fine grid level"
+  echo -e "   -m [method]    \t\t Method used (Possible: plain, CI, CW, MPSLM, Priestley, Quad, Analytic)"
+  echo -e "   -t #           \t\t Number of timesteps "
+  echo -e "   -w [windfield] \t\t What kind of wind (Possible: CircWind,ConvWind,DiagWind,Kaeser)"
+  echo 
+  echo -e "  Optional parameters:"
+  echo -e "   -d            \t\t turn diagnostics on (default: off)"
+  echo -e "   -gmv          \t\t turn GMV plot on (default: off)"
+  echo -e "   -o            \t\t save output into File (default: off)"
+  echo
+  exit
+fi
+
+
+
+
+#Create Parameters.dat according to given options
+
+echo "#-----------------------------------------------------------" > $paramfile
+echo "# Input file for batch mode input">>$paramfile
+echo "# input is controlled via keywords">>$paramfile
+echo "#">>$paramfile
+echo "# j. behrens 12/96">>$paramfile
+echo "#-----------------------------------------------------------">>$paramfile
+
+echo "# the experiment no. (0 for a new experiment)     [integer]">>$paramfile
+echo "EXPERIMENT_NUMBER">>$paramfile
+echo "0">>$paramfile
+
+echo "# desired maximum level of refinements            [integer]">>$paramfile
+echo "FINE_GRID_LEVEL">>$paramfile
+echo $grid_fine>>$paramfile
+
+echo "# minimum level of refinements                    [integer]">>$paramfile
+echo "COARSE_GRID_LEVEL">>$paramfile
+echo $grid_coarse>>$paramfile
+
+echo "# tolerance for refinement                        [real]">>$paramfile
+echo "TOLERANCE_OF_REFINEMENT">>$paramfile
+echo "0.2">>$paramfile
+
+echo "# tolerance for coarsening                        [real]">>$paramfile
+echo "TOLERANCE_OF_COARSENING">>$paramfile
+echo "0.1">>$paramfile
+
+echo "# watermark for refinement                        [real]">>$paramfile
+echo "WATERMARK_OF_REFINEMENT">>$paramfile
+echo "0.01">>$paramfile
+
+echo "# watermark for coarsening                        [real]">>$paramfile
+echo "WATERMARK_OF_COARSENING">>$paramfile
+echo "0.01">>$paramfile
+
+echo "# timestep length                                 [real]">>$paramfile
+echo "TIMESTEP_LENGTH">>$paramfile
+echo "1800.">>$paramfile
+
+echo "# first timestep                                  [integer]">>$paramfile
+echo "BEGINNING_TIMESTEP">>$paramfile
+echo "1">>$paramfile
+
+echo "# last timestep                                   [integer]">>$paramfile
+echo "FINISHING_TIMESTEP">>$paramfile
+echo $timestep_finish>>$paramfile
+
+echo "# plot in matlab style to file (no plot = 0)      [integer]">>$paramfile
+echo "MATLAB_PLOTTING">>$paramfile
+echo "0">>$paramfile
+
+echo "# plot in gmv style to file (no plot = 0)         [integer]">>$paramfile
+echo "GMV_FILE_PLOTTING">>$paramfile
+echo $gmv_plot>>$paramfile
+
+echo "# timesteps between plots                         [integer]">>$paramfile
+echo "STEPS_BTW_PLOTS">>$paramfile
+echo "1">>$paramfile
+
+echo "# timesteps between saves                         [integer]">>$paramfile
+echo "STEPS_BTW_SAVES">>$paramfile
+echo "500">>$paramfile
+
+echo "# save last timestep for next experiment (no = 0) [integer]">>$paramfile
+echo "SAVE_FINISH_CONFIGURATION">>$paramfile
+echo "0">>$paramfile
+
+echo "# take advecting wind from file (if given)        [character]">>$paramfile
+echo "WIND_FILE_NAME">>$paramfile
+echo "Windparam.dat">>$paramfile
+
+echo "# file defining the domain                        [character]">>$paramfile
+echo "DOMAIN_FILE_NAME">>$paramfile
+echo "Domain.dat">>$paramfile
+
+echo "# file defining the initial triangulation         [character]">>$paramfile
+echo "TRIANG_FILE_NAME">>$paramfile
+echo "Triang.dat">>$paramfile
+
+echo "# number of iterations in trajectory estimation   [integer]">>$paramfile
+echo "SLM_ITERATION_NUMBER">>$paramfile
+echo "4">>$paramfile
+echo "#-----------------------------------------------------------">>$paramfile
+echo "# END OF FILE">>$paramfile
+echo "#-----------------------------------------------------------">>$paramfile
+
+# Empty directory of earlier outputs
+
+if (test -r "./Flash3D_diag.0000"); then
+  rm ./Flash3D_diag.0000
+fi
+if (test -r "./Flash3D.out"); then
+  rm ./Flash3D.out
+fi
+if (test -r "./Flash3D_gmv.0000"); then
+  rm ./Flash3D_gmv.*
+fi
+if (test -r "./Flash3D_matlab.0000"); then
+  rm ./Flash3D_matlab.*
+fi
+
+#rm ./matlab_*
+
+
+# Compile the right FLASH3D version; incorporate method and windfield
+if (test ! -r "./FLASH3D"); then
+  echo "No compiled version of FLASH3D found. Trying to make one."
+  make FLASH3D > /dev/null
+  if (test ! -r "./FLASH3D"); then
+    echo "Failed."
+    exit
+  fi
+fi
+
+#Compile method and wind
+if (test $method = "Plain"); then
+  make FLASH3D
+  make Clip
+else
+  make $method
+fi
+
+echo make $wind
+make $wind
+make executable
+
+
+# Put the command string together according to options
+execute="./FLASH3D -b "
+if (test -n "$diagnostics"); then
+  execute=$execute"-d "
+fi
+if (test -n "$output_file"); then
+  execute=$execute"-o "
+fi
+execute=$execute"-f "$paramfile
+
+
+
+echo Using these parameters: Method: $method Windfield: $wind Coarse grid: $grid_coarse Fine grid:$grid_fine Last timestep:$timestep_finish
+echo $execute
+
+# Start FLASH3D
+$execute
+
+
+# Rename produced files according to method, wind and grid
+if (test -n "$diagnostics"); then
+  mv Flash3D_diag.0000 "diagnosis_"$method"_"$wind"_"$grid_coarse"_"$grid_fine".txt"
+fi
+
+if (test -n "$output_file"); then
+  mv Flash3D.out "out_"$method"_"$wind"_"$grid_coarse"_"$grid_fine".txt"
+fi
+
+if (test $gmv_plot = "1"); then
+  if (test -r "gmv_"$method"_"$wind"_"$grid_coarse"_"$grid_fine".0000"); then
+    rm "gmv_"$method"_"$wind"_"$grid_coarse"_"$grid_fine"."*
+  fi
+  for file in Flash3D_gmv.*; do mv $file  `echo $file | sed 's/\(Flash3D_gmv.\)/gmv_'$method'_'$wind'_'$grid_coarse'_'$grid_fine'.'/` ; done
+  for file in Flash3D_matlab.*; do mv $file  `echo $file | sed 's/\(Flash3D_matlab.\)/matlab_'$method'_'$wind'_'$grid_coarse'_'$grid_fine'.'/` ; done
+fi
