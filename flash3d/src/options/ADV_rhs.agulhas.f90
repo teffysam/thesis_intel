@@ -110,16 +110,16 @@
 
 	  ! Insert Agulhas tracer where the velocities are between -0.8 and -1 and 0.8 and 1. 
 !---------- initilize coordinates of emission source (cylinder)
-	  r_centr(1) = 22.9999                      ! x-Position [degree]
-	  r_centr(2) = -40.4999                            ! y-Position [degree]
+	  r_centr(1) = 22.9999                	         ! x-Position [degree]
+	  r_centr(2) = -40.4999                          ! y-Position [degree]
 	  r_centr(3) = 0.001                             ! bottom of ash column (above sealevel) [km]
 	  r_top = 0.003                                  ! top of ash column (above sealevel) [km]
-	  r_radius = 6.003                        ! Radius [degree]
+	  r_radius = 6.003                	             ! Radius [degree]
 
-	  r_vec = r_coord -r_centr                      ! Vector between center and coordinate
+	  r_vec = r_coord -r_centr                       ! Vector between center and coordinate
 	  r_dist = sqrt(dot_product(r_vec(1:2),r_vec(1:2)))      ! Distance between center and (x,y) [degree]
 
-	  r_high = r_top - r_centr(3)                   ! ash cloud thickness
+	  r_high = r_top - r_centr(3)                    ! ash cloud thickness
 
 !---------- calculate the advection at (x,y) (velocity increasing)
 
