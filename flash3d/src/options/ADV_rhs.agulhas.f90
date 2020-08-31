@@ -71,16 +71,14 @@
 	  REAL, DIMENSION(GRID_dimension), INTENT(in)  :: r_field
 !---------- calculate the advection at (x,y) (velocity increasing)
 
-	  IF (0.8 < r_field(1) .AND. 1 >= r_field(1) ) THEN
+	  IF (-1e9 < r_field(3) .AND. 1e9 >= r_field(3) ) THEN
 		!TODO #1 Check range
 		!TODO #2 Check again why this doesn't work
-		  write(*,*) r_field
 	    r_rhs = 2.0 !time_dependent_rhs(p_param,r_tim,r_radius,r_high)
 	  ELSE
 	    r_rhs= 0.0
 	  END IF
-	  write(*,*) r_field(1)
-
+       write(*,*) r_rhs
 	  RETURN
 	  END FUNCTION slm_ring
 

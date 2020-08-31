@@ -104,7 +104,6 @@
 !---------- interpolate to coordinate
 
 	  r_field= data_interpol(r_coord,i_timeinterval)
-	  write(*,*) r_field
 	  RETURN
  1000	  FORMAT(i3.3)
 	  END FUNCTION slm_windfield
