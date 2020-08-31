@@ -74,11 +74,10 @@
 	  IF (-1e9 < r_field(3) .AND. 1e9 >= r_field(3) ) THEN
 		!TODO #1 Check range
 		!TODO #2 Check again why this doesn't work
-	    r_rhs = 2.0 !time_dependent_rhs(p_param,r_tim,r_radius,r_high)
+	    r_rhs =  3.4677025E-04 !time_dependent_rhs(p_param,r_tim,r_radius,r_high)
 	  ELSE
 	    r_rhs= 0.0
 	  END IF
-       write(*,*) r_rhs
 	  RETURN
 	  END FUNCTION slm_ring
 
