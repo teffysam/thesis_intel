@@ -117,7 +117,7 @@
 	  r_dist = sqrt(dot_product(r_vec(1:2),r_vec(1:2)))      ! Distance between center and (x,y) [degree]
 
 	  r_high = r_top - r_centr(3)                    ! ash cloud thickness
-
+r_rhs=2.0
 !---------- calculate the advection at (x,y) (velocity increasing)
 
 !	  IF (0.8 < r_field(1) .AND. 1 >= r_field(1) ) THEN
