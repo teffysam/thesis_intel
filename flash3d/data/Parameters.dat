@@ -15,19 +15,19 @@ COARSE_GRID_LEVEL
 8
 # tolerance for refinement                        [real]
 TOLERANCE_OF_REFINEMENT
-0.01
+0.001
 # tolerance for coarsening                        [real]
 TOLERANCE_OF_COARSENING
-0.03
+0.001
 # watermark for refinement                        [real]
 WATERMARK_OF_REFINEMENT
-0.01
+0.001
 # watermark for coarsening                        [real]
 WATERMARK_OF_COARSENING
-0.01
+0.001
 # timestep length                                 [real]
 TIMESTEP_LENGTH
-86400.
+600.
 # first timestep                                  [integer]
 BEGINNING_TIMESTEP
 1

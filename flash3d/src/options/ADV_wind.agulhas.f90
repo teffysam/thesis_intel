@@ -247,7 +247,7 @@
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
 	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowx)
-	  r_flowx=r_flowx*2.*3.1415927/(40075000.)
+!	  r_flowx=r_flowx*2.*3.1415927/(40075000.)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var131 data')
 
@@ -255,7 +255,7 @@
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var132')
 	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowy)
-	  r_flowy=r_flowy*2.*3.1415927/(40075000.)
+!	  r_flowy=r_flowy*2.*3.1415927/(40075000.)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var132 data')
 
@@ -552,7 +552,7 @@
 	    i_lozz = i_z-1
 	    i_hizz = i_z
 	  END IF
-!TODO fix this problem tommorow
+!TODO fix this problem tommorow:fixed
 !---------- calculate weights for bilinear interpolation
 
 	  r_dux= r_lonu(i_hiux)- r_lonu(i_loux)

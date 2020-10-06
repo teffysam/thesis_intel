@@ -65,16 +65,16 @@
 	  PUBLIC :: slm_righthand, slm_ring
 	  CONTAINS
 !*****************************************************************
-	  FUNCTION slm_ring(r_field) RESULT (r_rhs)
+	  FUNCTION slm_ring(r_field, i_cnt) RESULT (r_rhs)
 	  IMPLICIT NONE
 	  REAL		                       		  :: r_rhs
+	  INTEGER, INTENT(in), OPTIONAL                  :: i_cnt
 	  REAL, DIMENSION(GRID_dimension), INTENT(in)  :: r_field
-!---------- calculate the advection at (x,y) (velocity increasing)
+!---------- Criteria for injecting tracer
 
-	  IF (-1e9 < r_field(3) .AND. 1e9 >= r_field(3) ) THEN
-		!TODO #1 Check range
-		!TODO #2 Check again why this doesn't work
-	    r_rhs =  3.4677025E-04 !time_dependent_rhs(p_param,r_tim,r_radius,r_high)
+	  IF (-1e-9 < r_field(3) .AND. 1e-9 >= r_field(3) .AND. i_cnt < 13) THEN
+		
+	    r_rhs =  3.4677025E-4 !time_dependent_rhs(p_param,r_tim,r_radius,r_high)
 	  ELSE
 	    r_rhs= 0.0
 	  END IF

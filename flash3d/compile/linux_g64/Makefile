@@ -221,7 +221,7 @@ Small_Pinatubo::
 	@cp $(SRCDIR)/SLM_simple_small_pinatubo.f90 SLM_simple.f90
 	@make datacopy
 	@cp $(DATDIR)/Wind_pinatubo_climaticphase.nc ../../../Windparam.dat
-	@cp $(DATDIR)/Triang_pinatubo_1cube.dat ../../../Triang.dat
+	@cp $(DATDIR)/Triang_pinatubo.dat ../../../Triang.dat
 
 Agulhas::
 	@make maincopy
