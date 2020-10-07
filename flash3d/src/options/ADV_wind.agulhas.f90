@@ -659,21 +659,17 @@
 	    r_dxvi= 1./r_dvx
 	    r_yu1= (r_hux* r_xu1+ r_lux* r_xu2)* r_dxvi
 	    r_yu2= (r_hux* r_xu3+ r_lux* r_xu4)* r_dxvi
-write(*,*) r_yu1, r_yu2
       ELSE
 	    r_yu1= r_xu1
 		r_yu2= r_xu3
-write(*,*) r_yu1, r_yu2
 	  END IF
 	  IF(r_duy /= 0.0) THEN
 	    r_dyui= 1./r_duy
 	    r_yv1= (r_huy* r_xv1+ r_luy* r_xv2)* r_dyui
 	    r_yv2= (r_huy* r_xv3+ r_luy* r_xv4)* r_dyui
-write(*,*) r_yv1, r_yv2
 	  ELSE
 		r_yv1= r_xv1
 	    r_yv2= r_xv3
-write(*,*) r_yv1, r_yv2
 	  END IF
 	  IF(r_dvx /= 0.0) THEN
 		r_dxvi= 1./r_dvx
