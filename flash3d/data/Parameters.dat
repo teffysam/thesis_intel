@@ -15,10 +15,10 @@ COARSE_GRID_LEVEL
 8
 # tolerance for refinement                        [real]
 TOLERANCE_OF_REFINEMENT
-0.001
+0.0001
 # tolerance for coarsening                        [real]
 TOLERANCE_OF_COARSENING
-0.001
+0.0001
 # watermark for refinement                        [real]
 WATERMARK_OF_REFINEMENT
 0.001

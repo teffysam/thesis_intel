@@ -72,9 +72,9 @@
 	  REAL, DIMENSION(GRID_dimension), INTENT(in)  :: r_field
 !---------- Criteria for injecting tracer
 
-	  IF (-1e-9 < r_field(3) .AND. 1e-9 >= r_field(3) .AND. i_cnt < 13) THEN
+	  IF (-1e-09 < r_field(3) .AND. 1e-09 >= r_field(3) .AND. i_cnt < 13) THEN
 		
-	    r_rhs =  3.4677025E-4 !time_dependent_rhs(p_param,r_tim,r_radius,r_high)
+	    r_rhs =  3.4e-06 !make this time dependent, need to stop pumping tracer into this 
 	  ELSE
 	    r_rhs= 0.0
 	  END IF
