@@ -27,7 +27,7 @@ WATERMARK_OF_COARSENING
 0.001
 # timestep length                                 [real]
 TIMESTEP_LENGTH
-600.
+86400.
 # first timestep                                  [integer]
 BEGINNING_TIMESTEP
 1

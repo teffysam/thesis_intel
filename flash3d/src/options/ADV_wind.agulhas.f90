@@ -282,7 +282,8 @@
 	  END DO
 !-----------set timeinterval length between winddata (Timeformat here: yymmdd,ddd)
 
-	  r_intervallen= (r_time(2) - r_time(1))*24*60*60
+	  !r_intervallen= (r_time(2) - r_time(1))*24*60*60
+	  r_intervallen= r_time(2) - r_time(1)
 
 !---------- close currents file
 
