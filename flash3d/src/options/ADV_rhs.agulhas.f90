@@ -71,7 +71,7 @@
 	  INTEGER, INTENT(in), OPTIONAL                  :: i_cnt
 	  REAL, DIMENSION(GRID_dimension), INTENT(in)  :: r_field
 !---------- Criteria for injecting tracer
-	  IF (1e-4 < r_field(1) .AND. i_cnt<1) THEN
+	  IF (1e-4 < r_field(1) .AND. i_cnt=1) THEN
 		
 	    r_rhs =  3.4 !make this time dependent, need to stop pumping tracer into this 
 	  ELSE
