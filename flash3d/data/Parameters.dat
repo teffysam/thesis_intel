@@ -12,19 +12,19 @@ FINE_GRID_LEVEL
 17
 # minimum level of refinements                    [integer]
 COARSE_GRID_LEVEL
-8
+1
 # tolerance for refinement                        [real]
 TOLERANCE_OF_REFINEMENT
-0.01
+0.001
 # tolerance for coarsening                        [real]
 TOLERANCE_OF_COARSENING
-0.01
+0.001
 # watermark for refinement                        [real]
 WATERMARK_OF_REFINEMENT
-0.01
+0.001
 # watermark for coarsening                        [real]
 WATERMARK_OF_COARSENING
-0.01
+0.001
 # timestep length                                 [real]
 TIMESTEP_LENGTH
 86400.

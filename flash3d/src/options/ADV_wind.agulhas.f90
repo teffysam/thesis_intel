@@ -655,18 +655,18 @@
 
 !---------- linear interpolation in y-direction
 
-	  IF(r_dvx /= 0.0) THEN
-	    r_dxvi= 1./r_dvx
-	    r_yu1= (r_hux* r_xu1+ r_lux* r_xu2)* r_dxvi
-	    r_yu2= (r_hux* r_xu3+ r_lux* r_xu4)* r_dxvi
+	  IF(r_dux /= 0.0) THEN
+	    r_dxui= 1./r_dux
+	    r_yu1= (r_hux* r_xu1+ r_lux* r_xu2)* r_dxui
+	    r_yu2= (r_hux* r_xu3+ r_lux* r_xu4)* r_dxui
       ELSE
 	    r_yu1= r_xu1
 		r_yu2= r_xu3
 	  END IF
-	  IF(r_duy /= 0.0) THEN
-	    r_dyui= 1./r_duy
-	    r_yv1= (r_huy* r_xv1+ r_luy* r_xv2)* r_dyui
-	    r_yv2= (r_huy* r_xv3+ r_luy* r_xv4)* r_dyui
+	  IF(r_dvy /= 0.0) THEN
+	    r_dyvi= 1./r_dvy
+	    r_yv1= (r_hvy* r_xv1+ r_lvy* r_xv2)* r_dyvi
+	    r_yv2= (r_hvy* r_xv3+ r_lvy* r_xv4)* r_dyvi
 	  ELSE
 		r_yv1= r_xv1
 	    r_yv2= r_xv3
