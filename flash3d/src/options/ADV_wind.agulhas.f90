@@ -587,7 +587,7 @@
 
 	  r_scalx= r_deg * 1./cos(r_coord(2)*PI/180.)  ! in degree/sec
 	  r_scaly= r_deg
-	  r_scalz= 1.                           ! km to m
+	  r_scalz= 1.  / 1000.                         ! km to m
 
 !---------- linear interpolation in x-direction
 ! Interpolation in a Arakawa Staggered C grid

@@ -72,8 +72,8 @@
 	  REAL, DIMENSION(GRID_dimension), INTENT(in)  :: r_field
 !---------- Criteria for injecting tracer
 
-	  IF (1.5e-5 < r_field(1)) THEN
-	    r_rhs =  34 !make this time dependent, need to stop pumping tracer into this 
+	  IF (0.5e-5 < r_field(1) .AND. i_cnt .LE. 61) THEN
+	    r_rhs =  1e5 !make this time dependent, need to stop pumping tracer into this 
 	  ELSE
 	    r_rhs= 0.0
 	  END IF

@@ -9,10 +9,10 @@ EXPERIMENT_NUMBER
 0
 # desired maximum level of refinements            [integer]
 FINE_GRID_LEVEL
-17
+11
 # minimum level of refinements                    [integer]
 COARSE_GRID_LEVEL
-1
+7
 # tolerance for refinement                        [real]
 TOLERANCE_OF_REFINEMENT
 0.001
