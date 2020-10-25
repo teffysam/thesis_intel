@@ -65,15 +65,16 @@
 	  PUBLIC :: slm_righthand, slm_ring
 	  CONTAINS
 !*****************************************************************
-	  FUNCTION slm_ring(r_field, i_cnt) RESULT (r_rhs)
+	  FUNCTION slm_ring(r_field, r_time) RESULT (r_rhs)
 	  IMPLICIT NONE
 	  REAL		                       		  :: r_rhs
-	  INTEGER, INTENT(in), OPTIONAL                  :: i_cnt
+	  REAL, INTENT(in), OPTIONAL                  :: r_time
 	  REAL, DIMENSION(GRID_dimension), INTENT(in)  :: r_field
-!---------- Criteria for injecting tracer
-
-	  IF (0.5e-5 < r_field(1) .AND. i_cnt .LE. 61) THEN
-	    r_rhs =  1e5 !make this time dependent, need to stop pumping tracer into this 
+	  
+!---------- Simple Criteria for injecting tracer
+	  
+	  IF (1e-5 < r_field(1) .AND. r_time .LE. 86400) THEN
+	    r_rhs =  1e7 !make this time dependent, need to stop pumping tracer into this 
 	  ELSE
 	    r_rhs= 0.0
 	  END IF

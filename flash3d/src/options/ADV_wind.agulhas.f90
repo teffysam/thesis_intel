@@ -255,7 +255,6 @@
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var132')
 	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowy)
-!	  r_flowy=r_flowy*2.*3.1415927/(40075000.)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var132 data')
 
@@ -263,7 +262,6 @@
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var135')
 	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowz)
-	  !r_flowz=r_flowz*2.*3.1415927/(40075000.)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var135 data')
 

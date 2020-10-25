@@ -9,7 +9,7 @@ EXPERIMENT_NUMBER
 0
 # desired maximum level of refinements            [integer]
 FINE_GRID_LEVEL
-11
+12
 # minimum level of refinements                    [integer]
 COARSE_GRID_LEVEL
 7

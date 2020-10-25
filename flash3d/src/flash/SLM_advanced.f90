@@ -269,8 +269,7 @@
 
 	  main_loop: DO i_cnt=1, i_arlen
 !	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
-	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(r_coord(:,i_cnt),r_tim),i_cnt)
-		  write(*,*) i_arlen
+	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(r_coord(:,i_cnt),r_tim),r_time)
 	  END DO main_loop
 
 	  RETURN
