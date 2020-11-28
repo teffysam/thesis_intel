@@ -42,15 +42,15 @@ ROOTDIR = $(HOME)/thesis_intel
 
 # SET atlas/blas DIRECTORY PATH
 # !! This has to be alterd by user !!
-BLASDIR =  /home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/lib
-BLASLIB = #-lblas
+BLASDIR = /home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/lib
+BLASLIB = -lblas #comment for intel
 
 # SET LAPACK DIRECTORY PATH
 # !! This has to be alterd by user !!
 # LAPACKDIR =
 #LAPACKDIR = /home/teffy/lapack/lapack-3.9.0/build/lib
-LAPACKDIR = /opt/intel/mkl/include#/home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/include
-LAPACKLIB = -mkl -lpthread -lc 
+LAPACKDIR =  /opt/intel/mkl/include/#/home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/include #/opt/intel/mkl/include
+LAPACKLIB =  -mkl #-lpthread -lc #-mkl
 
 # SET IO_EMIT LIBRARY PATH
 EMITDIR =  /usr/lib/# gcc/x86_64-pc-linux-gnu/4.8.5/

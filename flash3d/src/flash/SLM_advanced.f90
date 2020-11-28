@@ -229,7 +229,7 @@
 
 	    iter_loop: DO i_cnt2=1, p_param%phy%i_adviterations
 	      r_xyc= r_coord(:,i_cnt1)- r_fac* r_axy
-	      r_axy= r_dt0* slm_windfield(r_xyc, r_time=r_tim)
+	      r_axy= r_dt0* slm_windfield(p_param,r_xyc, r_time=r_tim)
 	    END DO iter_loop
 
 	    r_alpha(:,i_cnt1)= r_axy
@@ -269,7 +269,7 @@
 
 	  main_loop: DO i_cnt=1, i_arlen
 !	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
-	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(r_coord(:,i_cnt),r_tim),r_time)
+	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(p_param,r_coord(:,i_cnt),r_tim),r_time)
 	  END DO main_loop
 
 	  RETURN

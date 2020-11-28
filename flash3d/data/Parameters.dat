@@ -9,7 +9,7 @@ EXPERIMENT_NUMBER
 0
 # desired maximum level of refinements            [integer]
 FINE_GRID_LEVEL
-12
+13
 # minimum level of refinements                    [integer]
 COARSE_GRID_LEVEL
 7
@@ -33,7 +33,7 @@ BEGINNING_TIMESTEP
 1
 # last timestep                                   [integer]
 FINISHING_TIMESTEP
-60
+4
 # plot in matlab style to file (no plot = 0)      [integer]
 MATLAB_PLOTTING
 0
@@ -42,10 +42,10 @@ GMV_FILE_PLOTTING
 1
 # plot in VisNET window (no plot = 0)             [integer]
 VISNET_PLOTTING
-1
+0
 # screenshot VisNET window (no plot = 0)          [integer]
 VISNET_SCREENSHOT
-1
+0
 # timesteps between plots                         [integer]
 STEPS_BTW_PLOTS
 1

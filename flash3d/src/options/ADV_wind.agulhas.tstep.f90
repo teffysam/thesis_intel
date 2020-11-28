@@ -48,25 +48,25 @@
 	  INTEGER, PARAMETER    :: i_ioerr=0
 	  REAL :: r_intervallen, r_scalfacx, r_scalfacy, &
 	                           r_readlast, r_scalinvx, r_scalinvy
-	  !REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowx
-	  !REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowy
-	  !REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowz
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowx
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowy
+	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowz
 
-	  REAL, DIMENSION(100,50,23,1) :: r_flowx, r_flowy, r_flowz
+	  !REAL, DIMENSION(100,50,23,1) :: r_flowx, r_flowy, r_flowz
 
-	  REAL, DIMENSION(50)  :: r_latu, r_latv, r_latw
-	  REAL, DIMENSION(100) :: r_lonu, r_lonv, r_lonw
-	  REAL, DIMENSION(23) :: r_z, r_zw
-	  REAL				  :: r_time
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_latu
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_lonu
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_latv
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_lonv
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_latw
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_lonw
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_z
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_zw
-	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_time
+	!   REAL, DIMENSION(501)  :: r_latu, r_latv, r_latw
+	!   REAL, DIMENSION(1101) :: r_lonu, r_lonv, r_lonw
+	!   REAL, DIMENSION(23) :: r_z, r_zw
+	!   REAL				  :: r_time
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_latu
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lonu
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_latv
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lonv
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_latw
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lonw
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_z
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_zw
+	  REAL, DIMENSION(:), ALLOCATABLE     :: r_time
       INTEGER                            :: i_lon, i_lat, i_z, i_timesteps
 	  INTEGER                            :: i_timeinterval
 	  
@@ -90,10 +90,10 @@
 	  CHARACTER (LEN=3)                           :: c_num
 	  INTEGER                                     :: i_iost, i_cnt, j_cnt
 	  
-	  CHARACTER (LEN=io_fillen) :: c_name
+	!   CHARACTER (LEN=io_fillen) :: c_name
 
 
-	  c_name= p_control%io%c_windfile
+	!   c_name= p_control%io%c_windfile
 !---------- set time
 
 	  IF(present(r_time)) THEN
@@ -109,7 +109,7 @@
 	  data_read: IF(r_readlast <= r_tim) THEN
 
 		  !!!!! Try reading here
-	  CALL read_netcdf_currents(c_name,r_tim)
+	  CALL read_netcdf_currents(r_tim)
 !---------- update values for next open
 
 	    r_readlast    = r_readlast+ r_intervallen
@@ -121,13 +121,13 @@
 	  END IF data_read
 !---------- interpolate to coordinate
 	  r_field= data_interpol(r_coord,i_timeinterval)
-	! write(*,*) r_field 
+	!  write(*,*) r_coord, r_field 
 	  RETURN
  1000	  FORMAT(i3.3)
 	  END FUNCTION slm_windfield
 
 !*****************************************************************
-	  SUBROUTINE read_netcdf_currents(c_filename,r_tim)
+	  SUBROUTINE read_netcdf_currents(r_tim)
 
 !---------- local declarations
 
@@ -136,7 +136,7 @@
       
       
 !---------- input parameters      
-	  CHARACTER (LEN=io_fillen), INTENT(in)  :: c_filename
+	  CHARACTER (LEN=80) :: c_filename
 !---------- local variables
 	  INTEGER         :: i_alct, i_ncstat
 	  INTEGER         :: i_fileid, i_dimid, i_varid, countA(1),startA(1),startB(4),countB(4)
@@ -146,108 +146,127 @@
 	  character(256) :: my_errmsg
 	  
 !---------- open current file
+	  
+    
+! !---------- determine lon/lat/height/time dimension sizes (grid size of currents field)
 
+!       i_ncstat= nf_inq_dimid(i_fileid, 'lon_u', i_dimid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lon dimension')
+!       i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lon)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon dimension')
+      
+!       i_ncstat= nf_inq_dimid(i_fileid, 'lat_u', i_dimid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lat dimension')
+!       i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lat)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat dimension')
+	    
+! 	    i_ncstat= nf_inq_dimid(i_fileid, 'dep', i_dimid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify z dimension')
+!       i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_z)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 		CALL grid_error(c_error='[read_netcdf_currents]: could not read z dimension')
+		
+! !      i_ncstat= nf_inq_dimid(i_fileid, 'time', i_dimid)
+! !	  IF(i_ncstat /= NF_NOERR) &
+! !	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify time dimension')
+! !      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_timesteps)
+! i_timesteps=1
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time dimension')
+    
+! !---------- allocate lat/long/height/time coordinate arrays
+! !	  ALLOCATE( r_latu(i_lat), r_lonv(i_lon), r_lonw(i_lon), &
+! !	    		r_lonu(i_lon), r_latv(i_lat), r_latw(i_lat), &
+! !	    		r_z(i_z), r_zw(i_z), r_time(i_timesteps), stat= i_alct)
+! !	 !rite(*,*) i_alct 
+! !      IF(i_alct /= 0) &
+! !	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate lat/lon/z/time field')
+! !---------- read lat/long/height/time coordinate values
+
+!       i_ncstat= nf_inq_varid(i_fileid, 'lon_u', i_varid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
+!       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_lonu)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
+
+!       i_ncstat= nf_inq_varid(i_fileid, 'lat_u', i_varid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
+!       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_latu)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
+
+!       i_ncstat= nf_inq_varid(i_fileid, 'lon_v', i_varid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
+!       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_lonv)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
+
+!       i_ncstat= nf_inq_varid(i_fileid, 'lat_v', i_varid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
+!       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_latv)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
+
+!       i_ncstat= nf_inq_varid(i_fileid, 'lon_w', i_varid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
+!       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_lonw)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
+
+!       i_ncstat= nf_inq_varid(i_fileid, 'lat_w', i_varid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
+!       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_latw)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
+
+! 	  i_ncstat= nf_inq_varid(i_fileid, 'dep', i_varid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
+!       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_z)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
+
+! 	  i_ncstat= nf_inq_varid(i_fileid, 'depw', i_varid)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
+!       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_zw)
+! 	  IF(i_ncstat /= NF_NOERR) &
+! 		CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
+
+!Ensure memory is freed
+	  IF(ALLOCATED(r_flowx))	  DEALLOCATE(r_flowx)
+	  IF(ALLOCATED(r_flowy))	  DEALLOCATE(r_flowy)
+	  IF(ALLOCATED(r_flowz))	  DEALLOCATE(r_flowz)
+	  
+!---------- allocate current data arrays
+	
+
+	  ALLOCATE( r_flowx(i_lon, i_lat, i_z, i_timesteps), r_flowy(i_lon, i_lat, i_z, i_timesteps),&
+	    & r_flowz(i_lon, i_lat, i_z, i_timesteps), stat= i_alct, errmsg=my_errmsg)
+	write(*,*) i_alct, my_errmsg
+     IF(i_alct /= 0) &
+		CALL grid_error(c_error='[read_netcdf_currents]: could not allocate currents fields')
+		
+
+
+	  !READ TIME
+	  c_filename='/pool/testu'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
-    
-!---------- determine lon/lat/height/time dimension sizes (grid size of currents field)
 
-      i_ncstat= nf_inq_dimid(i_fileid, 'lon_u', i_dimid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lon dimension')
-      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lon)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon dimension')
-      
-      i_ncstat= nf_inq_dimid(i_fileid, 'lat_u', i_dimid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lat dimension')
-      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lat)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat dimension')
-	    
-	    i_ncstat= nf_inq_dimid(i_fileid, 'dep', i_dimid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify z dimension')
-      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_z)
-	  IF(i_ncstat /= NF_NOERR) &
-		CALL grid_error(c_error='[read_netcdf_currents]: could not read z dimension')
-		
-!      i_ncstat= nf_inq_dimid(i_fileid, 'time', i_dimid)
-!	  IF(i_ncstat /= NF_NOERR) &
-!	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify time dimension')
-!      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_timesteps)
-i_timesteps=1
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time dimension')
-    
-!---------- allocate lat/long/height/time coordinate arrays
-!	  ALLOCATE( r_latu(i_lat), r_lonv(i_lon), r_lonw(i_lon), &
-!	    		r_lonu(i_lon), r_latv(i_lat), r_latw(i_lat), &
-!	    		r_z(i_z), r_zw(i_z), r_time(i_timesteps), stat= i_alct)
-!	 !rite(*,*) i_alct 
-!      IF(i_alct /= 0) &
-!	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate lat/lon/z/time field')
-!---------- read lat/long/height/time coordinate values
-
-      i_ncstat= nf_inq_varid(i_fileid, 'lon_u', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
-      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_lonu)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
-
-      i_ncstat= nf_inq_varid(i_fileid, 'lat_u', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
-      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_latu)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
-
-      i_ncstat= nf_inq_varid(i_fileid, 'lon_v', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
-      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_lonv)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
-
-      i_ncstat= nf_inq_varid(i_fileid, 'lat_v', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
-      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_latv)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
-
-      i_ncstat= nf_inq_varid(i_fileid, 'lon_w', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
-      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_lonw)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
-
-      i_ncstat= nf_inq_varid(i_fileid, 'lat_w', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
-      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_latw)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
-
-	  i_ncstat= nf_inq_varid(i_fileid, 'dep', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
-      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_z)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
-
-	  i_ncstat= nf_inq_varid(i_fileid, 'depw', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
-      i_ncstat= nf_get_var_real(i_fileid, i_varid, r_zw)
-	  IF(i_ncstat /= NF_NOERR) &
-		CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
-
-      i_ncstat= nf_inq_varid(i_fileid, 'time', i_varid)
+      i_ncstat= nf_inq_varid(i_fileid, 'TIME1', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not determine time varid')
 	
@@ -264,18 +283,10 @@ countA(1)=i_timesteps
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time data')
 
-!---------- allocate current data arrays
-	!	IF(ALLOCATED(r_flowx))	  DEALLOCATE(r_flowx)
-	!			IF(ALLOCATED(r_flowy))	  DEALLOCATE(r_flowy)
-	!			IF(ALLOCATED(r_flowz))	  DEALLOCATE(r_flowz)
-	!  ALLOCATE( r_flowx(i_lon, i_lat, i_z, i_timesteps), r_flowy(i_lon, i_lat, i_z, i_timesteps),&
-	!    & r_flowz(i_lon, i_lat, i_z, i_timesteps), stat= i_alct, errmsg=my_errmsg)
-	!write(*,*) i_alct, my_errmsg
-    ! IF(i_alct /= 0) &
-	!    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate currents fields')
-
 !---------- read x-/y-/z-direction data of currents
-      i_ncstat= nf_inq_varid(i_fileid, 'uvel', i_varid)
+
+		!OPEN UVEL
+      i_ncstat= nf_inq_varid(i_fileid, 'UVEL', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
 startB(1)=1
@@ -289,24 +300,55 @@ countB(3)=i_z
 countB(4)=i_timesteps
 
 write(*,*) r_tim,r_ttim,startB, countB, i_timesteps
-	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowx(:,:,:,1))
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowx)
 write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var131 data')
+		CALL grid_error(c_error='[read_netcdf_currents]: could not read var131 data')
+		
+		i_ncstat= nf_close(i_fileid)
+		IF(i_ncstat /= NF_NOERR) &
+		  CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
 
-      i_ncstat= nf_inq_varid(i_fileid, 'vvel', i_varid)
+
+
+		!   OPEN VVEL
+		c_filename='/pool/testv'
+      i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
+	  IF(i_ncstat /= NF_NOERR) &
+		CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
+		
+      i_ncstat= nf_inq_varid(i_fileid, 'VVEL', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var132')
-	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowy(:,:,:,1))
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowy)
 	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var132 data')
+		CALL grid_error(c_error='[read_netcdf_currents]: could not read var132 data')
 
-      i_ncstat= nf_inq_varid(i_fileid, 'wvel', i_varid)
+		i_ncstat= nf_close(i_fileid)
+	IF(i_ncstat /= NF_NOERR) &
+	  CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
+
+
+
+
+	!   OPEN WVEL
+		c_filename='/pool/testw'
+      i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'WVEL', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var135')
-	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowz(:,:,:,1))
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowz)
 	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var135 data')
+		CALL grid_error(c_error='[read_netcdf_currents]: could not read var135 data')
+		
+		i_ncstat= nf_close(i_fileid)
+	IF(i_ncstat /= NF_NOERR) &
+	  CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
+
+
 
 !---------- Fix mask values
 	DO i_tm=1,i_timesteps
@@ -318,7 +360,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  	      IF(r_flowz(i_ln,i_lt,i_lz,i_tm) <= -8.99E+33) r_flowz(i_ln,i_lt,i_lz,i_tm)= 0.
 	  	    END DO
 	  	  END DO
-		  END DO
+		END DO
 	END DO
 !-----------set timeinterval length between winddata (Timeformat here: yymmdd,ddd)
 
@@ -327,9 +369,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 !---------- close currents file
 
-	i_ncstat= nf_close(i_fileid)
-	IF(i_ncstat /= NF_NOERR) &
-	  CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
+	
 
 
 	  END SUBROUTINE read_netcdf_currents
@@ -408,14 +448,16 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 !---------- local declarations
 
 	  IMPLICIT NONE
+	  INCLUDE "netcdf.inc"
 
-	  TYPE (control_struct)     :: p_control
+
+	  
 	!  TYPE (rt_info), INTENT(inout)	    :: p_tinfo
-	  CHARACTER (len=io_fillen) :: c_name
+	  
 
 !---------- initialize
 
-	 ! c_name= p_control%io%c_windfile
+	  
 	 ! write (*,*) p_tinfo%i_step
 
 !---------- read current data from NetCDF file
@@ -423,6 +465,130 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 ! This is moved into windfield into the IF loop
 !	  CALL read_netcdf_currents(c_name,p_tinfo)
 
+	  !!!! Moved vars that are constant from read_netcdf_currents
+	  
+      
+      
+      
+!---------- input parameters  
+	  TYPE (control_struct)     :: p_control    
+	  CHARACTER (LEN=80)  :: c_filename
+!---------- local variables
+	  INTEGER         :: i_alct, i_ncstat
+	  INTEGER         :: i_fileid, i_dimid, i_varid, countA(1),startA(1),startB(4),countB(4)
+	  
+	  
+	  
+
+	  c_filename= '/pool/agulhas_grid.cdf'
+!---------- open current file
+
+      i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
+    
+!---------- determine lon/lat/height/time dimension sizes (grid size of currents field)
+! check ncdump for agulhas_grid LON_U is stored by (X_T3150_4250 , Y_T1245_1745) or (1101,501)
+      i_ncstat= nf_inq_dimid(i_fileid, 'X_T3150_4250', i_dimid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lon dimension')
+      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lon)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon dimension')
+      
+      i_ncstat= nf_inq_dimid(i_fileid, 'Y_T1245_1745', i_dimid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lat dimension')
+      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lat)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat dimension')
+	    
+	    i_ncstat= nf_inq_dimid(i_fileid, 'AX008', i_dimid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify z dimension')
+      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_z)
+	  IF(i_ncstat /= NF_NOERR) &
+		CALL grid_error(c_error='[read_netcdf_currents]: could not read z dimension')
+		
+!      i_ncstat= nf_inq_dimid(i_fileid, 'time', i_dimid)
+!	  IF(i_ncstat /= NF_NOERR) &
+!	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify time dimension')
+!      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_timesteps)
+i_timesteps=1
+!	  IF(i_ncstat /= NF_NOERR) &
+!	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time dimension')
+    
+!---------- allocate lat/long/height/time coordinate arrays
+	  ALLOCATE( r_latu(i_lat), r_lonv(i_lon), r_lonw(i_lon), &
+	    		r_lonu(i_lon), r_latv(i_lat), r_latw(i_lat), &
+	    		r_z(i_z), r_zw(i_z), r_time(i_timesteps), stat= i_alct)
+	 !write(*,*) i_alct 
+     IF(i_alct /= 0) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate lat/lon/z/time field')
+!---------- read lat/long/height/time coordinate values
+
+      i_ncstat= nf_inq_varid(i_fileid, 'LON_U', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
+      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ i_lon, 1 /), r_lonu)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'LAT_U', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
+      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ 1, i_lat /), r_latu)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'LON_V', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
+      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ i_lon, 1 /), r_lonv)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'LAT_V', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
+      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ 1, i_lat /), r_latv)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'LON_TS', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
+      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ i_lon, 1 /), r_lonw)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
+
+      i_ncstat= nf_inq_varid(i_fileid, 'LAT_TS', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
+      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ 1, i_lat /), r_latw)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
+
+	  i_ncstat= nf_inq_varid(i_fileid, 'AX008', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
+	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_z)
+	  r_z=r_z/1000
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
+
+	  i_ncstat= nf_inq_varid(i_fileid, 'AX009', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
+	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_zw)
+	  r_zw=r_zw/1000
+	  IF(i_ncstat /= NF_NOERR) &
+		CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
+
+	! Close the grid file
+	  i_ncstat= nf_close(i_fileid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
 
 !---------- initialize some values
 

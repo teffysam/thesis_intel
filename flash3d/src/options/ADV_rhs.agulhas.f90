@@ -73,8 +73,8 @@
 	  
 !---------- Simple Criteria for injecting tracer
 	  
-	  IF (1e-5 < r_field(1) .AND. r_time .LE. 86400) THEN
-	    r_rhs =  1e7 !make this time dependent, need to stop pumping tracer into this 
+	  IF (0 < r_field(1) .AND. r_field(2) < 0 .AND. r_time .LE. 86400) THEN
+	    r_rhs =  1e6 !make this time dependent, need to stop pumping tracer into this 
 	  ELSE
 	    r_rhs= 0.0
 	  END IF

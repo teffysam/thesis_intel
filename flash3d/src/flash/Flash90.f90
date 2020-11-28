@@ -105,7 +105,8 @@
 
 !---------- terminate the SLM (gracefully free memory, terminate grid, etc.)
 
-	CALL slm_finish(p_grid, p_contr)
+
+		CALL slm_finish(p_grid, p_contr)
 
 !---------- terminate grid generator
 

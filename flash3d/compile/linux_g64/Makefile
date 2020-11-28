@@ -84,7 +84,7 @@ CC 	= icc
 LOADER  = ifort
 # --------------------- next are for debugging ------------------#
 ifeq ($(strip $(MODE)),debug)
-  FFLAGS  = -fast  -ggdb #-fbounds-check-fpic -funderscoring # -C
+  FFLAGS  = -O0 -CB -ggdb#-fbounds-check-fpic -funderscoring # -C
   CFLAGS  = -ggdb -fpic
   LDFLAGS = -ggdb
 endif
@@ -218,14 +218,16 @@ Small_Pinatubo::
 	@make maincopy
 	@cp $(OPTDIR)/ADV_wind.pinatubo ADV_wind.f90
 	@cp $(OPTDIR)/ADV_rhs.pinatubo_climaticphase ADV_rhs.f90
+	@cp $(SRCDIR)/ADV_sp_semilagrange.f90 ADV_semilagrange.f90
 	@cp $(SRCDIR)/SLM_simple_small_pinatubo.f90 SLM_simple.f90
+	@cp $(SRCDIR)/SLM_advanced_small_pinatubo.f90 SLM_advanced.f90
 	@make datacopy
 	@cp $(DATDIR)/Wind_pinatubo_climaticphase.nc ../../../Windparam.dat
 	@cp $(DATDIR)/Triang_pinatubo_1cube.dat ../../../Triang.dat
 
 Agulhas::
 	@make maincopy
-	@cp $(OPTDIR)/ADV_wind.agulhas.f90 ADV_wind.f90
+	@cp $(OPTDIR)/ADV_wind.agulhas.tstep.f90 ADV_wind.f90
 	@cp $(OPTDIR)/ADV_rhs.agulhas.f90 ADV_rhs.f90
 	@make datacopy
 	@ln -s /pool/c_grid_agulhas.nc ../../../Windparam.dat

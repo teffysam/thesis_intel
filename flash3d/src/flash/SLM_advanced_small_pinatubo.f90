@@ -1,18 +1,18 @@
 !*****************************************************************
 !
 ! MODULE NAME:
-!	SLM_simple
+!	SLM_advanced
 ! FUNCTION:
 !	provide simple semi-Lagrangian routines
 ! CONTAINS:
 !-----------------------------------------------------------------
 !
 ! NAME:
-!	slm_step
+!	slm_astep
 ! FUNCTION:
 !	one step of the basic SLM algorithm
 ! SYNTAX:
-!	CALL slm_step(int, real.arr, real.arr)
+!	CALL slm_astep(int, real.arr, real.arr)
 ! ON INPUT:
 !	...
 ! ON OUTPUT:
@@ -24,12 +24,12 @@
 !-----------------------------------------------------------------
 !
 ! NAME:
-!	slm_displace
+!	slm_adisplace
 ! FUNCTION:
 !	extrapolate the alpha, values for the displacements of the upstream
 !	points from the gridpoints
 ! SYNTAX:
-!	CALL slm_displace(int, real.arr, real.arr)
+!	CALL slm_adisplace(int, real.arr, real.arr)
 ! ON INPUT:
 !	i_arlen: array length for the real arrays	integer
 !	r_coord: real array of xy-coordinates		real
@@ -42,11 +42,11 @@
 !-----------------------------------------------------------------
 !
 ! NAME:
-!	slm_update
+!	slm_aupdate
 ! FUNCTION:
 !	calculate the update to the velocity
 ! SYNTAX:
-!	CALL slm_update(int, real.arr, real.arr)
+!	CALL slm_aupdate(int, real.arr, real.arr)
 ! ON INPUT:
 !	i_arlen: array length for the real arrays	integer
 !	r_rside: array with right hand side values	real
@@ -60,11 +60,11 @@
 !-----------------------------------------------------------------
 !
 ! NAME:
-!	slm_upstream
+!	slm_aupstream
 ! FUNCTION:
 !	calculate right hand side of the equation (upstream values)
 ! SYNTAX:
-!	CALL slm_upstream(int, real.arr, real.arr)
+!	CALL slm_aupstream(int, real.arr, real.arr)
 ! ON INPUT:
 !	i_arlen: array length for the real arrays	integer
 !	r_alpha: displacement vectors to each point	real
@@ -78,11 +78,11 @@
 !-----------------------------------------------------------------
 !
 ! NAME:
-!	slm_interpolate
+!	slm_ainterpolate
 ! FUNCTION:
 !	do the interpolation
 ! SYNTAX:
-!	CALL slm_interpolate(grid, int, real, real.arr, real.arr, real.arr)
+!	CALL slm_ainterpolate(grid, int, real, real.arr, real.arr, real.arr)
 ! ON INPUT:
 !	p_ogrid: grid handle to old grid (with data)	TYPE (grid_handle)
 !	r_fac:   factor at which point to interpolate	REAL
@@ -100,7 +100,7 @@
 !-----------------------------------------------------------------
 !
 ! PUBLIC:
-!	slm_step
+!	slm_astep
 ! COMMENTS:
 !
 ! USES:
@@ -113,18 +113,18 @@
 !	1. original version		j. behrens	12/2002
 !
 !*****************************************************************
-	MODULE SLM_simple
+	MODULE SLM_advanced
 	  USE FLASH_parameters
 	  USE MISC_timing
 	  USE GRID_api
 	  USE ADV_wind
 	  USE ADV_rhs
 	  PRIVATE
-	  PUBLIC  :: slm_step
+	  PUBLIC  :: slm_astep
 	  CONTAINS
 !*****************************************************************
-	  SUBROUTINE slm_step(p_ghand, p_param, p_time, r_modtime, i_size, &
-	                       r_coord, r_tracer)
+	  SUBROUTINE slm_astep(p_ghand, p_param, p_time, r_modtime, i_size, &
+	                       r_coord,r_tracer)
 
 !---------- local declarations
 
@@ -146,7 +146,7 @@
 
 	  IF(i_size <= 0) THEN
 	    IF(GRID_parameters%iolog > 0) &
-	      write(GRID_parameters%iolog,*) 'INFO [slm_step]: Zero step size, returning to calling routine'
+	      write(GRID_parameters%iolog,*) 'INFO [slm_astep]: Zero step size, returning to calling routine'
 	    RETURN
 	  END IF
 
@@ -154,25 +154,25 @@
 
 	  allocate(r_newvl(i_size), r_alpha(GRID_dimension,i_size), stat=i_alct)
 	  not_alloc: IF(i_alct /= 0) THEN
-	    CALL grid_error(c_error='[slm_step]: could not allocate aux. arrays')
+	    CALL grid_error(c_error='[slm_astep]: could not allocate aux. arrays')
 	  END IF not_alloc
 
 !-SLM--------- calculate trajectory pieces (displacements)
 
 	  CALL stop_watch('start',3,p_time)
-	  CALL slm_displace(p_param, i_size, r_coord, r_alpha, r_time=r_modtime)
+	  CALL slm_adisplace(p_param, i_size, r_coord, r_alpha, r_time=r_modtime)
 	  CALL stop_watch('stop ',3,p_time)
 
 !-SLM--------- calculate right hand side
 
 	  CALL stop_watch('start',4,p_time)
-	  CALL slm_upstream(p_ghand, i_size, r_coord, r_alpha, r_newvl)
+	  CALL slm_aupstream(p_ghand, i_size, r_coord, r_alpha, r_newvl)
 	  CALL stop_watch('stop ',4,p_time)
 
 !-SLM--------- calculate new grid values
 
 	  CALL stop_watch('start',5,p_time)
-	  CALL slm_update(p_param, i_size, r_coord, r_newvl, r_tracer, r_time=r_modtime)
+	  CALL slm_aupdate(p_param, i_size, r_coord, r_newvl, r_tracer, r_time=r_modtime)
 	  CALL stop_watch('stop ',5,p_time)
 
 !-SLM--------- put alpha values to u and v field entries
@@ -184,20 +184,15 @@
 	                    i_valpoint=GRID_vcomp)
 	  CALL grid_putinfo(p_ghand(i_timeplus), i_size, r_nodevalues=r_alpha(3,:), &
 	                    i_valpoint=GRID_wcomp)
-!where (1 < r_alpha < 0.8) 
-!r_tracer =2.0
-!end where
-
-
 
 !-SLM--------- deallocate work arrays
 
 	  deallocate(r_alpha, r_newvl)
 
 	  RETURN
-	  END SUBROUTINE slm_step
+	  END SUBROUTINE slm_astep
 !*****************************************************************
-	  SUBROUTINE slm_displace(p_param, i_arlen, r_coord, r_alpha, r_time)
+	  SUBROUTINE slm_adisplace(p_param, i_arlen, r_coord, r_alpha, r_time)
 
 !---------- local declarations
 
@@ -234,17 +229,17 @@
 
 	    iter_loop: DO i_cnt2=1, p_param%phy%i_adviterations
 	      r_xyc= r_coord(:,i_cnt1)- r_fac* r_axy
-	      r_axy= r_dt0* slm_windfield(p_param,r_xyc, r_time=r_tim)
+	      r_axy= r_dt0* slm_windfield(r_xyc, r_time=r_tim)
 	    END DO iter_loop
 
 	    r_alpha(:,i_cnt1)= r_axy
 	  END DO unknown_loop
 
 	  RETURN
-	  END SUBROUTINE slm_displace
+	  END SUBROUTINE slm_adisplace
 
 !*****************************************************************
-	  SUBROUTINE slm_update(p_param, i_arlen, r_coord, r_rside, r_udate, r_time)
+	  SUBROUTINE slm_aupdate(p_param, i_arlen, r_coord, r_rside, r_udate, r_time)
 
 !---------- local declarations
 
@@ -273,14 +268,14 @@
 	  END IF
 
 	  main_loop: DO i_cnt=1, i_arlen
-!	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
-		r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(p_param,r_coord(:,i_cnt),r_tim),r_time)
+	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
 	  END DO main_loop
+
 	  RETURN
-	  END SUBROUTINE slm_update
+	  END SUBROUTINE slm_aupdate
 
 !*****************************************************************
-	  SUBROUTINE slm_upstream(p_mesh, i_arlen, r_coord, &
+	  SUBROUTINE slm_aupstream(p_mesh, i_arlen, r_coord, &
 	                          r_alpha, r_rside)
 
 !---------- local declarations
@@ -300,14 +295,14 @@
 
 !---------- in the linear advection case this is just interpolation
 
-	  CALL slm_interpolate(p_mesh, r_fac, i_arlen, r_coord, &
+	  CALL slm_ainterpolate(p_mesh, r_fac, i_arlen, r_coord, &
 	                       r_alpha, r_rside)
 
 	  RETURN
-	  END SUBROUTINE slm_upstream
+	  END SUBROUTINE slm_aupstream
 
 !*****************************************************************
-	  SUBROUTINE slm_interpolate(p_mesh, r_fac, i_arlen, &
+	  SUBROUTINE slm_ainterpolate(p_mesh, r_fac, i_arlen, &
 	                             r_coord, r_alpha, r_rside)
 
 !---------- local declarations
@@ -377,6 +372,6 @@
 	  DEALLOCATE(r_upstr)
 
 	  RETURN
-	  END SUBROUTINE slm_interpolate
+	  END SUBROUTINE slm_ainterpolate
 
-	END MODULE SLM_simple
+	END MODULE SLM_advanced

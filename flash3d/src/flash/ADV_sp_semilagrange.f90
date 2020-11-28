@@ -585,7 +585,8 @@
 	    CALL grid_timeduplicate(p_ghand(i_timeplus), p_ghand(i_time))
 
 !---------- initialize wind field calculation
-		CALL slm_windinit(p_param)
+
+	    CALL slm_windinit(p_param)
 
 !---------- if an old experiment is to be continued from stored data:
 
@@ -640,7 +641,7 @@
 
 !---------- gracefully terminate wind field calculations
 
-CALL slm_windquit
+	  CALL slm_windquit
 
 	  RETURN
  1010	  FORMAT(a28,i4.4)
@@ -670,6 +671,7 @@ CALL slm_windquit
           INTEGER                                                     :: i_loopquit
 
 !---------- initialize timestep info structure
+
 	  p_timestepinfo%i_step       = 0
 	  p_timestepinfo%i_adapit     = 0
 	  p_timestepinfo%l_ploted     = .FALSE.
@@ -747,6 +749,8 @@ CALL slm_windquit
 
 	      i_size= p_ghand(i_timeplus)%i_nnumber
 	      allocate(r_tracer(i_size), r_coord(GRID_dimension,i_size), stat=i_alct)
+		  write(*,*) r_tracer, i_size
+	      write(*,*) i_alct
 	      IF(i_alct /= 0) CALL grid_error(38)
 
 !-SLM--------- do the following SLM calculations in arrays (grid-point-wise)
@@ -891,8 +895,6 @@ CALL slm_windquit
 	         1x,'*****             Final Information Output            *****',/ &
 	         1x,'***** ----- ----- ----- ----- ----- ----- ----- ----- *****')
  1010	  FORMAT(a28,i4.4)
- 
- 
 	  END SUBROUTINE slm_timestepping
 
 	END MODULE ADV_semilagrange

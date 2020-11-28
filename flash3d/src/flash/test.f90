@@ -585,26 +585,28 @@
 	    CALL grid_timeduplicate(p_ghand(i_timeplus), p_ghand(i_time))
 
 !---------- initialize wind field calculation
-		CALL slm_windinit(p_param)
+!call slm_windinit moved into slm_timstepping for reading once slice at a time
 
 !---------- if an old experiment is to be continued from stored data:
 
-	  ELSE new_experiment
-
-!---------- create grid from saveset, first compile filename
-
-	    i_tmp= p_param%phy%i_experiment- 1
-	    write(c_tmp,*) trim(GRID_parameters%program_name), '_save.'
-	    write(c_file,1010) trim(c_tmp), i_tmp
-	    c_file= adjustl(c_file)
-
-	    CALL grid_readinitial(p_ghand, c_file)
-
-!---------- initialize wind field calculation
-
-	    CALL slm_windinit(p_param)
-
-	  END IF new_experiment
+END IF new_experiment
+! ###### No need for a new exp
+!	  ELSE new_experiment
+!
+!!---------- create grid from saveset, first compile filename
+!
+!	    i_tmp= p_param%phy%i_experiment- 1
+!	    write(c_tmp,*) trim(GRID_parameters%program_name), '_save.'
+!	    write(c_file,1010) trim(c_tmp), i_tmp
+!	    c_file= adjustl(c_file)
+!
+!	    CALL grid_readinitial(p_ghand, c_file)
+!
+!!---------- initialize wind field calculation
+!
+!	    CALL slm_windinit(p_param)
+!
+!	  END IF new_experiment
 
 	  RETURN
  1010	  FORMAT(a28,i4.4)
@@ -670,6 +672,7 @@ CALL slm_windquit
           INTEGER                                                     :: i_loopquit
 
 !---------- initialize timestep info structure
+
 	  p_timestepinfo%i_step       = 0
 	  p_timestepinfo%i_adapit     = 0
 	  p_timestepinfo%l_ploted     = .FALSE.
@@ -693,6 +696,8 @@ CALL slm_windquit
 	                           'grid value updt.', 'grid adaption   ', &
 	                           'diagnostics     ', 'whole timestep  '/), p_time)
 	                           
+!Inject first time slice here as intial (fingers crossed)
+	!    CALL slm_windinit(p_param,p_timestepinfo)
 !---------- if diagnostics are demanded, initialize diagnostical output
 
 	  IF(p_param%cmd%l_diagnostics) THEN
@@ -723,6 +728,8 @@ CALL slm_windquit
 	  CALL io_putruntimeinfo(p_ghand(i_timeplus), p_timestepinfo, p_time)
 
 !---------- timestep loop
+!CALL slm_windquit
+!CALL slm_windinit(p_param,p_timestepinfo)
 
 	  CALL stop_watch('start',1,p_timeaux)
 	  CALL stop_watch('start',8,p_time)
@@ -736,7 +743,8 @@ CALL slm_windquit
 	    CALL stop_watch('start',2,p_time)
 	    CALL grid_timeduplicate(p_ghand(i_time), p_ghand(i_timeplus))
 	    CALL stop_watch('stop ',2,p_time)
-
+! windinit injection here #test
+		CALL slm_windinit(p_param,p_timestepinfo)
 !---------- adaptive (inner) loop
 
 	    l_refined= .TRUE.
@@ -746,7 +754,10 @@ CALL slm_windquit
 !---------- allocate and extract working arrays
 
 	      i_size= p_ghand(i_timeplus)%i_nnumber
+		  write(*,*) i_size, i_timeplus
 	      allocate(r_tracer(i_size), r_coord(GRID_dimension,i_size), stat=i_alct)
+	      write(*,*) r_tracer, i_size
+	      write(*,*) i_alct
 	      IF(i_alct /= 0) CALL grid_error(38)
 
 !-SLM--------- do the following SLM calculations in arrays (grid-point-wise)
@@ -801,7 +812,7 @@ CALL slm_windquit
 	    deallocate(r_coord, r_tracer)
 
 !---------- diagnostics, if requested
-
+	!	p_timestepinfo%i_step  = i_timecount
 	    IF(p_param%cmd%l_diagnostics) THEN
 	      CALL stop_watch('start',7,p_time)
 	      CALL slm_diagnostics(p_grid(i_timeplus), p_param, p_timestepinfo, c_action='diag')
@@ -863,6 +874,10 @@ CALL slm_windquit
 
 !            IF (i_loopquit /= 0) EXIT time_loop
 
+! Deallocate to make room for next slice
+!Inject time slices here (MAIN) 
+	  !  CALL slm_windinit(p_param,p_timestepinfo)
+		CALL slm_windquit
 	  END DO time_loop
 	  CALL stop_watch('stop ',1,p_timeaux)
 

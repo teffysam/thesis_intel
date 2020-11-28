@@ -51,28 +51,36 @@
 	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowx
 	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowy
 	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowz
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_latu
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lonu
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_latv
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lonv
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_latw
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lonw
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_z
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_zw
-	  REAL, DIMENSION(:), ALLOCATABLE     :: r_time
+
+	  !REAL, DIMENSION(100,50,23,1) :: r_flowx, r_flowy, r_flowz
+
+	  REAL, DIMENSION(50)  :: r_latu, r_latv, r_latw
+	  REAL, DIMENSION(100) :: r_lonu, r_lonv, r_lonw
+	  REAL, DIMENSION(23) :: r_z, r_zw
+	  REAL				  :: r_time
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_latu
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_lonu
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_latv
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_lonv
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_latw
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_lonw
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_z
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_zw
+	  !REAL, DIMENSION(:), ALLOCATABLE     :: r_time
       INTEGER                            :: i_lon, i_lat, i_z, i_timesteps
 	  INTEGER                            :: i_timeinterval
 	  
-	  PUBLIC                    :: slm_windfield, slm_windinit, slm_windquit,r_field
+	  PUBLIC                    :: slm_windfield, slm_windinit, slm_windquit,r_field, read_netcdf_currents
 	  
 	  CONTAINS
 !*****************************************************************
-	  FUNCTION slm_windfield(r_coord, r_time) RESULT (r_field)
+	  FUNCTION slm_windfield(p_control,r_coord, r_time) RESULT (r_field)
 
 !---------- local declarations
 
 	  IMPLICIT NONE
 
+	  TYPE (control_struct), INTENT(in)     :: p_control
 	  REAL, DIMENSION(GRID_dimension), INTENT(in) :: r_coord
 	  REAL, INTENT(in), OPTIONAL :: r_time
 	  REAL, DIMENSION(GRID_dimension)             :: r_field
@@ -81,7 +89,11 @@
 	  CHARACTER (LEN=35)                          :: c_tmp
 	  CHARACTER (LEN=3)                           :: c_num
 	  INTEGER                                     :: i_iost, i_cnt, j_cnt
+	  
+	  CHARACTER (LEN=io_fillen) :: c_name
 
+
+	  c_name= p_control%io%c_windfile
 !---------- set time
 
 	  IF(present(r_time)) THEN
@@ -91,41 +103,48 @@
 	  END IF
 	  
 
+	  !!!! i_timeinterval needs to PREDEFINED to ONE! This is passed into data_interpol
+	  i_timeinterval=1
 !---------- decide, if data has to be read
-
 	  data_read: IF(r_readlast <= r_tim) THEN
 
+		  !!!!! Try reading here
+	  CALL read_netcdf_currents(c_name,r_tim)
 !---------- update values for next open
 
 	    r_readlast    = r_readlast+ r_intervallen
-	    i_timeinterval= i_timeinterval+ 1
+	
+	
+	
+		!  This NEEDS to be SWITCHED OFF
+		!    i_timeinterval= i_timeinterval+ 1
 	  END IF data_read
-
 !---------- interpolate to coordinate
-
 	  r_field= data_interpol(r_coord,i_timeinterval)
+	! write(*,*) r_field 
 	  RETURN
  1000	  FORMAT(i3.3)
 	  END FUNCTION slm_windfield
 
 !*****************************************************************
-	  SUBROUTINE read_netcdf_currents(c_filename)
+	  SUBROUTINE read_netcdf_currents(c_filename,r_tim)
 
 !---------- local declarations
 
 	  IMPLICIT NONE
       INCLUDE "netcdf.inc"
       
+      
 !---------- input parameters      
 	  CHARACTER (LEN=io_fillen), INTENT(in)  :: c_filename
-	  
 !---------- local variables
 	  INTEGER         :: i_alct, i_ncstat
-      INTEGER,SAVE    :: i_fileid
-      INTEGER         :: i_dimid, i_varid
-	  INTEGER		  :: startA,countA
-      INTEGER         :: i_tm, i_ln, i_lt, i_lz
-
+	  INTEGER         :: i_fileid, i_dimid, i_varid, countA(1),startA(1),startB(4),countB(4)
+	  INTEGER         :: i_tm, i_ln, i_lt, i_lz
+	  REAL :: r_tim
+	  REAL :: r_ttim
+	  character(256) :: my_errmsg
+	  
 !---------- open current file
 
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
@@ -155,21 +174,21 @@
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not read z dimension')
 		
-      i_ncstat= nf_inq_dimid(i_fileid, 'time', i_dimid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify time dimension')
-      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_timesteps)
+!      i_ncstat= nf_inq_dimid(i_fileid, 'time', i_dimid)
+!	  IF(i_ncstat /= NF_NOERR) &
+!	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify time dimension')
+!      i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_timesteps)
+i_timesteps=1
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time dimension')
     
 !---------- allocate lat/long/height/time coordinate arrays
-
-	  ALLOCATE( r_latu(i_lat), r_lonv(i_lon), r_lonw(i_lon), &
-				r_lonu(i_lon), r_latv(i_lat), r_latw(i_lat), &
-				r_z(i_z), r_zw(i_z), r_time(i_timesteps), stat= i_alct)
-      IF(i_alct /= 0) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate lat/lon/z/time field')
-
+!	  ALLOCATE( r_latu(i_lat), r_lonv(i_lon), r_lonw(i_lon), &
+!	    		r_lonu(i_lon), r_latv(i_lat), r_latw(i_lat), &
+!	    		r_z(i_z), r_zw(i_z), r_time(i_timesteps), stat= i_alct)
+!	 !rite(*,*) i_alct 
+!      IF(i_alct /= 0) &
+!	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate lat/lon/z/time field')
 !---------- read lat/long/height/time coordinate values
 
       i_ncstat= nf_inq_varid(i_fileid, 'lon_u', i_varid)
@@ -230,45 +249,69 @@
 
       i_ncstat= nf_inq_varid(i_fileid, 'time', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine time varid')
-	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_time)
+		CALL grid_error(c_error='[read_netcdf_currents]: could not determine time varid')
+	
+		r_ttim=0
+	  IF(r_tim .ne. 0) THEN 
+		r_ttim=r_tim/86400
+	  END IF
+	  write(*,*) r_tim,r_ttim
+startA(1)=r_ttim+1
+countA(1)=i_timesteps
+!write(*,*) startA, countA 
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startA, countA, r_time)
+!write(*,*) i_ncstat
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time data')
 
 !---------- allocate current data arrays
 
+		!Ensure memoris freed
+		IF(ALLOCATED(r_flowx))	  DEALLOCATE(r_flowx)
+		IF(ALLOCATED(r_flowy))	  DEALLOCATE(r_flowy)
+		IF(ALLOCATED(r_flowz))	  DEALLOCATE(r_flowz)
 	  ALLOCATE( r_flowx(i_lon, i_lat, i_z, i_timesteps), r_flowy(i_lon, i_lat, i_z, i_timesteps),&
-	    & r_flowz(i_lon, i_lat, i_z, i_timesteps), stat= i_alct)
-      IF(i_alct /= 0) &
+	    & r_flowz(i_lon, i_lat, i_z, i_timesteps), stat= i_alct, errmsg=my_errmsg)
+	write(*,*) i_alct, my_errmsg
+     IF(i_alct /= 0) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate currents fields')
 
 !---------- read x-/y-/z-direction data of currents
-
       i_ncstat= nf_inq_varid(i_fileid, 'uvel', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
-	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowx)
-!	  r_flowx=r_flowx*2.*3.1415927/(40075000.)
+startB(1)=1
+startB(2)=1
+startB(3)=1
+startB(4)=r_ttim+1
+
+countB(1)=i_lon
+countB(2)=i_lat
+countB(3)=i_z
+countB(4)=i_timesteps
+
+write(*,*) r_tim,r_ttim,startB, countB, i_timesteps
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowx)
+write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var131 data')
 
       i_ncstat= nf_inq_varid(i_fileid, 'vvel', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var132')
-	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowy)
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowy)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var132 data')
 
       i_ncstat= nf_inq_varid(i_fileid, 'wvel', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var135')
-	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_flowz)
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowz)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read var135 data')
 
 !---------- Fix mask values
-
-	  DO i_tm=1,i_timesteps
+	DO i_tm=1,i_timesteps
 	  	DO i_lt= 1,i_lat
 	  	  DO i_ln= 1,i_lon
 	  	    DO i_lz= 1,i_z
@@ -277,18 +320,19 @@
 	  	      IF(r_flowz(i_ln,i_lt,i_lz,i_tm) <= -8.99E+33) r_flowz(i_ln,i_lt,i_lz,i_tm)= 0.
 	  	    END DO
 	  	  END DO
-	  	END DO
-	  END DO
+		END DO
+	END DO
 !-----------set timeinterval length between winddata (Timeformat here: yymmdd,ddd)
 
 	  !r_intervallen= (r_time(2) - r_time(1))*24*60*60
-	  r_intervallen= r_time(2) - r_time(1)
+	  r_intervallen= 86400 !r_time(2) - r_time(1)
 
 !---------- close currents file
 
-	  i_ncstat= nf_close(i_fileid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
+	i_ncstat= nf_close(i_fileid)
+	IF(i_ncstat /= NF_NOERR) &
+	  CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
+
 
 	  END SUBROUTINE read_netcdf_currents
 
@@ -310,7 +354,7 @@
 	  i_tstart = p_control%phy%i_frsttimestep
 	  i_tend = p_control%phy%i_lasttimestep
 
-!---------- allocate interpolated windfiels
+!---------- allocate interpolated windfields
 	  ALLOCATE(r_fx(i_lon,i_lat,i_z,i_tend-i_tstart+1),r_fy(i_lon,i_lat,i_z,i_tend-i_tstart+1),&
 	    &r_fz(i_lon,i_lat,i_z,i_tend-i_tstart+1), stat= i_alct)
       IF(i_alct /= 0) &
@@ -342,9 +386,9 @@
 
 !---------- Reallocate Windfields with new shape
 
-	  DEALLOCATE(r_flowx, r_flowy, r_flowz)
-	  ALLOCATE(r_flowx(i_lon,i_lat,i_z,i_tend-i_tstart+1),r_flowy(i_lon,i_lat,i_z,i_tend-i_tstart+1),&
-	    &r_flowz(i_lon,i_lat,i_z,i_tend-i_tstart+1) ,stat= i_alct)
+	!  DEALLOCATE(r_flowx, r_flowy, r_flowz)
+	!  ALLOCATE(r_flowx(i_lon,i_lat,i_z,i_tend-i_tstart+1),r_flowy(i_lon,i_lat,i_z,i_tend-i_tstart+1),&
+	!    &r_flowz(i_lon,i_lat,i_z,i_tend-i_tstart+1) ,stat= i_alct)
       IF(i_alct /= 0) &
 	    CALL grid_error(c_error='[time_interpol]: could not allocate windfields r_flowx, r_flowy, r_flowz')
 
@@ -368,15 +412,19 @@
 	  IMPLICIT NONE
 
 	  TYPE (control_struct)     :: p_control
+	!  TYPE (rt_info), INTENT(inout)	    :: p_tinfo
 	  CHARACTER (len=io_fillen) :: c_name
 
 !---------- initialize
 
-	  c_name= p_control%io%c_windfile
+	 ! c_name= p_control%io%c_windfile
+	 ! write (*,*) p_tinfo%i_step
 
 !---------- read current data from NetCDF file
 
-	  CALL read_netcdf_currents(c_name)
+! This is moved into windfield into the IF loop
+!	  CALL read_netcdf_currents(c_name,p_tinfo)
+
 
 !---------- initialize some values
 
@@ -385,8 +433,7 @@
 !	  r_intervallen= 3600.
 
 !---------- Interpolate between timesteps
-
-	  CALL time_interpol(p_control)
+!	  CALL time_interpol(p_control)
 
 	  RETURN
  2000	  FORMAT(a80)
@@ -396,15 +443,17 @@
 !*****************************************************************
 	  SUBROUTINE slm_windquit
 
-!---------- local declarations
-
 	  IMPLICIT NONE
+	INTEGER 		:: i_ncstat,i_fileid
 	  
 !---------- deallocate wind data arrays
 
-	  DEALLOCATE(r_flowx, r_flowy, r_flowz)
-	  DEALLOCATE(r_lonu, r_latu, r_lonv, r_latv, r_lonw, r_latw, r_z, r_zw)
+!IF(ALLOCATED(r_flowx))	  DEALLOCATE(r_flowx)
+!IF(ALLOCATED(r_flowy))	  DEALLOCATE(r_flowy)
+!IF(ALLOCATED(r_flowz))	  DEALLOCATE(r_flowz)
 
+!	  DEALLOCATE(r_lonu, r_latu, r_lonv, r_latv, r_lonw, r_latw, r_z, r_zw)
+		
 	  RETURN
 	  END SUBROUTINE slm_windquit
 
