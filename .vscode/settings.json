@@ -1,6 +1,6 @@
 {
     "git.ignoreLimitWarning": true,
-    "editor.fontFamily": " 'BitstreamVeraSansMono Nerd Font Mono'",
+    "editor.fontFamily": " 'Monospace'",
     "C_Cpp.default.customConfigurationVariables": {},
     "debug.console.fontFamily": "'BitStreamVeraSansMono Nerd Font Mono'",
     "terminal.integrated.fontFamily": "'BitStreamVeraSansMono Nerd Font Mono'"

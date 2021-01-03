@@ -1,0 +1,174 @@
+ ***** ***** ***** ***** ***** ***** ***** ***** ***** *****
+ ***** PROGRAM:   Flash3D                              *****
+ ***** VERSION:   00.02.00                             *****
+ *****            Started in BATCH input mode          *****
+ ***** INPUTFILE: Parameters.dat                       *****
+ ***** ***** ***** ***** ***** ***** ***** ***** ***** *****
+
+ ***** ***** ***** ***** ***** ***** ***** ***** ***** *****
+ *****                Global Parameters                *****
+ ***** ----- ----- ----- ----- ----- ----- ----- ----- *****
+ ***** Experiment No.                                0 *****
+ ***** ----- ----- ----- ----- ----- ----- ----- ----- *****
+ ***** Finest grid level                            17 *****
+ ***** Coarsest grid level                           8 *****
+ ***** Refinement tolerance                 0.1000E-02 *****
+ ***** Coarsening tolerance                 0.1000E-01 *****
+ ***** Refinement watermark                 0.1000E-02 *****
+ ***** Coarsening watermark                 0.1000E-01 *****
+ ***** ----- ----- ----- ----- ----- ----- ----- ----- *****
+ ***** Timestep length                      0.8640E+05 *****
+ ***** First timestep                                1 *****
+ ***** Last timestep                                 4 *****
+ ***** ----- ----- ----- ----- ----- ----- ----- ----- *****
+ ***** Timesteps between save                      500 *****
+ ***** Timesteps between plot                        1 *****
+ ***** Flag for last save                            0 *****
+ ***** ----- ----- ----- ----- ----- ----- ----- ----- *****
+ ***** Iterations for trajectories                   4 *****
+ ***** ***** ***** ***** ***** ***** ***** ***** ***** *****
+
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+ +++++            Runtime Information Output           +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Timestep Number                               0 +++++
+ +++++ Model time                           0.0000E+00 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Inner iterations (for adaptation)             0 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Number of tetrahedra                       4590 +++++
+ +++++ Number of tetrahedra (fine grid)           2304 +++++
+ +++++ Number of elements                         7328 +++++
+ +++++ Number of elements (fine grid)             4832 +++++
+ +++++ Number of edges                            3545 +++++
+ +++++ Number of edges (fine grid)                3044 +++++
+ +++++ Number of nodes                             517 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Time spent in plotting               0.0000E+00 +++++
+ +++++ Time spent in grid duplication       0.0000E+00 +++++
+ +++++ Time spent in trajectory calc.       0.0000E+00 +++++
+ +++++ Time spent in right hand side        0.0000E+00 +++++
+ +++++ Time spent in grid value updt.       0.0000E+00 +++++
+ +++++ Time spent in grid adaption          0.0000E+00 +++++
+ +++++ Time spent in diagnostics            0.0000E+00 +++++
+ +++++ Time spent in whole timestep         0.0000E+00 +++++
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+ +++++            Runtime Information Output           +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Timestep Number                               1 +++++
+ +++++ Model time                           0.8640E+05 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Inner iterations (for adaptation)             1 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Number of tetrahedra                       4590 +++++
+ +++++ Number of tetrahedra (fine grid)           2304 +++++
+ +++++ Number of elements                         7328 +++++
+ +++++ Number of elements (fine grid)             4832 +++++
+ +++++ Number of edges                            3545 +++++
+ +++++ Number of edges (fine grid)                3044 +++++
+ +++++ Number of nodes                             517 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Time spent in plotting               0.0000E+00 +++++
+ +++++ Time spent in grid duplication       0.0000E+00 +++++
+ +++++ Time spent in trajectory calc.       0.2000E+01 +++++
+ +++++ Time spent in right hand side        0.0000E+00 +++++
+ +++++ Time spent in grid value updt.       0.0000E+00 +++++
+ +++++ Time spent in grid adaption          0.0000E+00 +++++
+ +++++ Time spent in diagnostics            0.0000E+00 +++++
+ +++++ Time spent in whole timestep         0.2000E+01 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Plotting performed in this step                 +++++
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+ +++++            Runtime Information Output           +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Timestep Number                               2 +++++
+ +++++ Model time                           0.1728E+06 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Inner iterations (for adaptation)             1 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Number of tetrahedra                       4590 +++++
+ +++++ Number of tetrahedra (fine grid)           2304 +++++
+ +++++ Number of elements                         7328 +++++
+ +++++ Number of elements (fine grid)             4832 +++++
+ +++++ Number of edges                            3545 +++++
+ +++++ Number of edges (fine grid)                3044 +++++
+ +++++ Number of nodes                             517 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Time spent in plotting               0.2500E+00 +++++
+ +++++ Time spent in grid duplication       0.0000E+00 +++++
+ +++++ Time spent in trajectory calc.       0.1750E+01 +++++
+ +++++ Time spent in right hand side        0.0000E+00 +++++
+ +++++ Time spent in grid value updt.       0.0000E+00 +++++
+ +++++ Time spent in grid adaption          0.0000E+00 +++++
+ +++++ Time spent in diagnostics            0.0000E+00 +++++
+ +++++ Time spent in whole timestep         0.2000E+01 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Plotting performed in this step                 +++++
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+ +++++            Runtime Information Output           +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Timestep Number                               3 +++++
+ +++++ Model time                           0.2592E+06 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Inner iterations (for adaptation)             1 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Number of tetrahedra                       4590 +++++
+ +++++ Number of tetrahedra (fine grid)           2304 +++++
+ +++++ Number of elements                         7328 +++++
+ +++++ Number of elements (fine grid)             4832 +++++
+ +++++ Number of edges                            3545 +++++
+ +++++ Number of edges (fine grid)                3044 +++++
+ +++++ Number of nodes                             517 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Time spent in plotting               0.0000E+00 +++++
+ +++++ Time spent in grid duplication       0.0000E+00 +++++
+ +++++ Time spent in trajectory calc.       0.1750E+01 +++++
+ +++++ Time spent in right hand side        0.0000E+00 +++++
+ +++++ Time spent in grid value updt.       0.0000E+00 +++++
+ +++++ Time spent in grid adaption          0.0000E+00 +++++
+ +++++ Time spent in diagnostics            0.0000E+00 +++++
+ +++++ Time spent in whole timestep         0.1750E+01 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Plotting performed in this step                 +++++
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+ +++++            Runtime Information Output           +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Timestep Number                               4 +++++
+ +++++ Model time                           0.3456E+06 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Inner iterations (for adaptation)             1 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Number of tetrahedra                       4590 +++++
+ +++++ Number of tetrahedra (fine grid)           2304 +++++
+ +++++ Number of elements                         7328 +++++
+ +++++ Number of elements (fine grid)             4832 +++++
+ +++++ Number of edges                            3545 +++++
+ +++++ Number of edges (fine grid)                3044 +++++
+ +++++ Number of nodes                             517 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Time spent in plotting               0.0000E+00 +++++
+ +++++ Time spent in grid duplication       0.0000E+00 +++++
+ +++++ Time spent in trajectory calc.       0.1750E+01 +++++
+ +++++ Time spent in right hand side        0.0000E+00 +++++
+ +++++ Time spent in grid value updt.       0.0000E+00 +++++
+ +++++ Time spent in grid adaption          0.0000E+00 +++++
+ +++++ Time spent in diagnostics            0.0000E+00 +++++
+ +++++ Time spent in whole timestep         0.1750E+01 +++++
+ +++++ ----- ----- ----- ----- ----- ----- ----- ----- +++++
+ +++++ Plotting performed in this step                 +++++
+ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++ +++++
+
+ ***** ***** ***** ***** ***** ***** ***** ***** ***** *****
+ *****             Final Information Output            *****
+ ***** ----- ----- ----- ----- ----- ----- ----- ----- *****
+ ***** Total time for timesteps             0.7750E+01 *****
+ ***** ***** ***** ***** ***** ***** ***** ***** ***** *****
+

@@ -108,11 +108,11 @@
 !---------- decide, if data has to be read
 	  data_read: IF(r_readlast <= r_tim) THEN
 
-		  !!!!! Try reading here
+		   !!!!! Try reading here
 	  CALL read_netcdf_currents(r_tim)
 !---------- update values for next open
-
-	    r_readlast    = r_readlast+ r_intervallen
+	  
+	    r_readlast = r_readlast+ r_intervallen
 	
 	
 	
@@ -120,8 +120,8 @@
 		!    i_timeinterval= i_timeinterval+ 1
 	  END IF data_read
 !---------- interpolate to coordinate
+	!   write(*,*) r_coord
 	  r_field= data_interpol(r_coord,i_timeinterval)
-	!  write(*,*) r_coord, r_field 
 	  RETURN
  1000	  FORMAT(i3.3)
 	  END FUNCTION slm_windfield
@@ -285,10 +285,7 @@ countA(1)=i_timesteps
 
 !---------- read x-/y-/z-direction data of currents
 
-		!OPEN UVEL
-      i_ncstat= nf_inq_varid(i_fileid, 'UVEL', i_varid)
-	  IF(i_ncstat /= NF_NOERR) &
-	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
+
 startB(1)=1
 startB(2)=1
 startB(3)=1
@@ -299,8 +296,12 @@ countB(2)=i_lat
 countB(3)=i_z
 countB(4)=i_timesteps
 
-write(*,*) r_tim,r_ttim,startB, countB, i_timesteps
-	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowx)
+		!OPEN UVEL
+      i_ncstat= nf_inq_varid(i_fileid, 'UVEL', i_varid)
+	  IF(i_ncstat /= NF_NOERR) &
+	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
+	 
+		i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowx)
 write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not read var131 data')
@@ -530,14 +531,14 @@ i_timesteps=1
       i_ncstat= nf_inq_varid(i_fileid, 'LON_U', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lon varid')
-      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ i_lon, 1 /), r_lonu)
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ i_lon, 1 /), r_lonu)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon data')
 
       i_ncstat= nf_inq_varid(i_fileid, 'LAT_U', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
-      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ 1, i_lat /), r_latu)
+	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 100, 1 /), (/ 1, i_lat /), r_latu)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
 
@@ -551,7 +552,7 @@ i_timesteps=1
       i_ncstat= nf_inq_varid(i_fileid, 'LAT_V', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
-      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ 1, i_lat /), r_latv)
+      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 100, 1 /), (/ 1, i_lat /), r_latv)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
 
@@ -565,7 +566,7 @@ i_timesteps=1
       i_ncstat= nf_inq_varid(i_fileid, 'LAT_TS', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine lat varid')
-      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 1, 1 /), (/ 1, i_lat /), r_latw)
+      i_ncstat= nf_get_vara_real(i_fileid, i_varid, (/ 100, 1 /), (/ 1, i_lat /), r_latw)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lat data')
 

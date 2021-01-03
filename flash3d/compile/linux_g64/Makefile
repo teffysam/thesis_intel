@@ -230,7 +230,8 @@ Agulhas::
 	@cp $(OPTDIR)/ADV_wind.agulhas.tstep.f90 ADV_wind.f90
 	@cp $(OPTDIR)/ADV_rhs.agulhas.f90 ADV_rhs.f90
 	@make datacopy
-	@ln -s /pool/c_grid_agulhas.nc ../../../Windparam.dat
+	# @ln -s /pool/c_grid_agulhas.nc ../../../Windparam.dat
+	# @cp $(DATDIR)/BACKUP_smaller_agulhas_Triang.dat ../../../Triang.dat
 	@cp $(DATDIR)/Triang_agulhas_test_cuboid.dat ../../../Triang.dat
 
 Quadrature::

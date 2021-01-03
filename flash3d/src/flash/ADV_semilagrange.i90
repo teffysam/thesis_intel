@@ -1,0 +1,899 @@
+# 1 "/home/teffy/thesis_intel/flash3d/src/flash/ADV_semilagrange.f90"
+!*****************************************************************
+!
+! MODULE NAME:
+!	ADV_semilagrange
+! FUNCTION:
+!	perform semi-Lagrangian advection
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_adapt
+! FUNCTION:
+!	adapt the grid according to an error estimate
+! SYNTAX:
+!	CALL slm_adapt(grid, param, logical)
+! ON INPUT:
+!	p_ghand:   handle for the grid		TYPE (grid_handle)
+!	p_param:   global parameter structure	TYPE (global_param)
+! ON OUTPUT:
+!	l_changed: flag for changed grid	LOGICAL
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_initialize
+! FUNCTION:
+!	initialize the advection problem
+! SYNTAX:
+!	CALL slm_initialize(grid, param)
+! ON INPUT:
+!	p_param: parameter data structure	TYPE (global_param)
+! ON OUTPUT:
+!	p_ghand: grid handling data structure	TYPE (grid_handle)
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_finish
+! FUNCTION:
+!	terminate slm (free dynamically alloc. memory, ...)
+! SYNTAX:
+!	CALL slm_finish(grid, param)
+! ON INPUT:
+!	p_ghand: grid handling data structure	TYPE (grid_handle)
+!	p_param: parameter data structure	TYPE (global_param)
+! ON OUTPUT:
+!
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_timestepping
+! FUNCTION:
+!	perform the timestepping in the slm
+! SYNTAX:
+!	CALL slm_timestepping(grid, param, cmd)
+! ON INPUT:
+!	p_ghand: grid handling data structure	TYPE (grid_handle)
+!	p_param: parameter data structure	TYPE (global_param)
+!	p_cmdln: command line argument struct.	TYPE (cmdline)
+! ON OUTPUT:
+!	p_ghand: grid handling data structure	TYPE (grid_handle)
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! PUBLIC:
+!	slm_initialize, slm_finish, slm_timestepping
+! COMMENTS:
+!
+! USES:
+!	FLASH_parameters, MISC_timing, IO_gmvplot, IO_matlabplot,
+!	IO_utils, GRID_api, SLM_errorestimate, SLM_initial, SLM_simple,
+!	SLM_advanced, ADV_wind, ADV_rhs
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	10/96
+!	2. several improvements/fixes	j. behrens	11/96-1/97
+!	3. nodal values time depend.	j. behrens	1/97
+!	4. stop_watch removed, plot	j. behrens	1/97
+!	   (position) changed, inner
+!	   iteration counter added
+!	5. slm_adapt changed 		j. behrens	2/97
+!	6. slm_adapt changed to hide
+!	   grid data structures		j. behrens	7/97
+!	7. control data structure	j. behrens	12/97
+!	8. non-homog. rhs added		j. behrens	2/98
+!	9. compliant to amatos 1.0	j. behrens	12/2000
+!	10. changed slm_timestepping	j. behrens	12/2003
+!	    (SLM_simple)
+!
+!*****************************************************************
+	MODULE ADV_semilagrange
+	  USE FLASH_parameters
+	  USE MISC_timing
+!-- added for visnetplot [flo]:
+!	  USE IO_visnetplot
+	  USE IO_gmvplot
+	  USE IO_vtuplot
+	  USE IO_matlabplot
+	  USE IO_utils
+	  USE GRID_api
+	  USE SLM_errorestimate
+	  USE SLM_initial
+	  USE SLM_simple
+	  USE SLM_advanced
+	  USE ADV_wind
+	  USE ADV_rhs
+	  PRIVATE
+	  PUBLIC  :: slm_initialize, slm_finish, slm_timestepping
+	  CONTAINS
+!*****************************************************************
+	  SUBROUTINE slm_adapt(p_ghand, p_param, l_changed, l_water)
+
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  TYPE (grid_handle), INTENT(inout)      :: p_ghand
+	  TYPE (control_struct), INTENT(in)      :: p_param
+	  LOGICAL, INTENT(out)                   :: l_changed
+	  LOGICAL, OPTIONAL, INTENT(in)          :: l_water
+	  LOGICAL                                :: l_switch
+	  REAL                                   :: r_errmx, &
+	    r_refcrit, r_crscrit, r_fac
+	  INTEGER                                :: i_size, &
+	    i_manyc, i_manyr, i_alct, i_cnt
+	  REAL, DIMENSION(:), ALLOCATABLE        :: r_aux1
+	  INTEGER, DIMENSION(:), ALLOCATABLE     :: i_aux1, i_aux2
+	  LOGICAL                                :: l_ref, l_crs
+
+!---------- initialize refinement flag
+
+	  l_changed= .FALSE.
+
+!---------- handle watermark switch
+
+	  wat_present: IF(present(l_water)) THEN
+	    l_switch= l_water
+	  ELSE wat_present
+	    l_switch= .TRUE.
+	  END IF wat_present
+
+!---------- allocate work arrays
+
+	  i_size= p_ghand%i_tnumfine
+	  allocate(r_aux1(i_size), i_aux1(i_size), i_aux2(i_size), &
+                   stat=i_alct)
+	  not_alloc: IF(i_alct /= 0) THEN
+	    CALL grid_error(35)
+	  END IF not_alloc
+
+!---------- estimate the local error
+
+	  CALL slm_errorest(p_ghand, i_size, r_aux1)
+
+!---------- debugging
+
+!	  CALL grid_putinfo(p_ghand, i_size, i_valpoint= GRID_ucomp, r_nodevalues= r_aux1)
+!	  CALL plot_gmv(p_ghand, i_time=9900)
+
+!---------- set coarsening/refinement criterion
+
+	  r_errmx= maxval(r_aux1(1:i_size))
+	  r_crscrit= r_errmx* p_param%phy%r_crstolerance
+	  r_refcrit= r_errmx* p_param%phy%r_reftolerance
+
+!---------- get level information and set up flags for refinement/coarsening
+
+	  CALL grid_getinfo(p_ghand, i_size, l_finelevel= .TRUE., i_tetralevel= i_aux1)
+	  DO i_cnt=1,i_size
+	    i_aux2(i_cnt)= 0
+	    IF((i_aux1(i_cnt) > p_param%phy%i_crslevel) .AND. &
+	       (r_aux1(i_cnt) < r_crscrit)) i_aux2(i_cnt)= GRID_pleasecoarse
+	    IF((i_aux1(i_cnt) < p_param%phy%i_reflevel) .AND. &
+	       (r_aux1(i_cnt) > r_refcrit)) i_aux2(i_cnt)= GRID_pleaserefine
+	  END DO
+
+!---------- determine if there is enough to be done (this can be
+!           switched off by l_water=.FALSE.)
+
+	  IF(l_switch) THEN
+	    i_manyr= count(i_aux2 == GRID_pleaserefine)
+	    r_fac= float(i_manyr)/ float(i_size)
+	    enough_ref: IF(r_fac > p_param%phy%r_refwatermark) THEN
+	      l_ref= .TRUE.
+	    ELSE
+	      l_ref= .FALSE.
+	    END IF enough_ref
+
+	    i_manyc= count(i_aux2 == GRID_pleasecoarse)
+	    r_fac= float(i_manyc)/ float(i_size)
+	    enough_crs: IF(r_fac > p_param%phy%r_crswatermark) THEN
+	      l_crs= .TRUE.
+	    ELSE
+	      l_crs= .FALSE.
+	    END IF enough_crs
+	  ELSE
+	    l_ref= .TRUE.
+	    l_crs= .TRUE.
+	  END IF
+
+!---------- update grid flags
+
+	  update: IF(l_ref .OR. l_crs) THEN
+	    CALL grid_getinfo(p_ghand, i_size, l_finelevel= .TRUE., i_tetrastatus= i_aux1)
+	    IF(l_ref) i_aux1= merge(i_aux2, i_aux1, i_aux2==GRID_pleaserefine)
+	    IF(l_crs) i_aux1= merge(i_aux2, i_aux1, i_aux2==GRID_pleasecoarse)
+	    CALL grid_putinfo(p_ghand, i_size, l_finelevel= .TRUE., i_tetrastatus= i_aux1)
+	  END IF update
+
+!---------- deallocate work arrays
+
+	  deallocate(r_aux1, i_aux1, i_aux2)
+
+!---------- adapt the grid
+
+	  CALL grid_adapt(p_ghand, l_changed)
+
+	  RETURN
+	  END SUBROUTINE slm_adapt
+
+!*****************************************************************
+	  SUBROUTINE slm_diagnostics(p_ghand, p_param, p_tinfo, c_action)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+	  TYPE (grid_handle), INTENT(in)           :: p_ghand
+	  TYPE (control_struct), INTENT(inout)     :: p_param
+	  TYPE (rt_info), INTENT(in)               :: p_tinfo
+	  CHARACTER (len=4), INTENT(in), OPTIONAL  :: c_action
+	  INTEGER, SAVE                            :: i_iodiag
+	  CHARACTER (len=32)                       :: c_file
+	  CHARACTER (len=28)                       :: c_tmp
+	  REAL, PARAMETER                          :: r_1o3= (1./3.)
+	  INTEGER                                  :: i_fst, i_tmp, &
+	    i_size, i_alct, i_1, i_2, i_3, i_4, i_5, i_6, i_a, i_b, &
+	    i_edgelen_size
+	  REAL, SAVE                               :: r_rfm0, r_rsm0
+	  REAL                                     :: r_dispn, r_rfm, r_rsm, &
+	    r_ts, r_calci, r_calcs, r_mxnrm, r_l2nrm, r_max, r_min, r_diffn, &
+	    r_edgelen_min, r_edgelen_max
+	  REAL, DIMENSION(:), ALLOCATABLE          :: r_aux1, r_aux2, &
+	    r_aux3, r_aux4, r_arr_edgelength
+
+!---------- action init
+
+	  present_act: IF(present(c_action)) THEN
+	    action_type: IF(c_action == 'init') THEN
+
+!---------- open file for diagnostic output
+
+	      i_iodiag= 9
+	      i_tmp   = p_param%phy%i_experiment
+	      write(c_tmp,*) trim(GRID_parameters%program_name), '_diag.'
+	      write(c_file,1010) trim(c_tmp), i_tmp
+	      c_file= adjustl(c_file)
+	      open(i_iodiag, file= c_file, action= 'write', form= 'formatted', &
+	           iostat= i_fst)
+	      not_opened: IF(i_fst /= 0) THEN
+	        CALL grid_error(36)
+	      END IF not_opened
+	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'INFO: Filename: ', c_file, ' opened on unit: ', i_iodiag
+
+!---------- allocate workspace
+
+	      i_size= p_ghand%i_nnumber
+	      i_edgelen_size = p_ghand%i_gnumber
+	      allocate(r_aux1(i_size), r_aux2(i_size), r_aux3(i_size), r_aux4(i_size), &
+	               r_arr_edgelength(i_edgelen_size), stat=i_alct)
+	      not_alloc: IF(i_alct /= 0) THEN
+	        CALL grid_error(37)
+	      END IF not_alloc 
+	      r_aux1= 0.0		! nodal values of computed solution
+              r_aux2= 0.0		! volume of patch around each node
+	      r_aux3= 0.0		! nodal values of analytic solution
+	      r_aux4= 0.0		! auxiliary variable
+	      r_arr_edgelength=0.0	! init
+
+!---------- get the edgelength
+
+	      CALL grid_edgelength(p_ghand, r_edgelen_max, r_edgelen_min, r_arr_edgelength)
+
+
+!---------- calculate reference values, ... extract actual calculated concentration
+
+	      CALL grid_getinfo(p_ghand, i_size, i_valpoint= GRID_tracer, &
+	                        r_nodevalues= r_aux1)
+
+!---------- calculate volume pieces for each node; FOR 3D ONLY, WRONG FOR 2D!
+
+	      CALL grid_nodevolume(p_ghand, i_size, r_aux2)
+
+!---------- calculate analytical solution
+
+	      r_ts= p_param%phy%r_deltatime* float(p_tinfo%i_step)
+	      CALL slm_analyticsolution(p_ghand, r_ts, i_size, r_aux3)
+
+!---------- now the integral of the concentration (mass) is
+
+	      r_calci= dot_product(r_aux1, r_aux2)
+	      r_rfm0 = r_calci
+
+!---------- the integral of the squared concentration ("entropy"(?)) is
+
+	      r_aux4 = r_aux1* r_aux1
+	      r_calcs= dot_product(r_aux4, r_aux2)
+	      r_rsm0 = r_calcs
+
+!---------- the maximum-norm of the error is
+
+	      r_aux4 = abs(r_aux1- r_aux3)
+	      r_mxnrm= maxval(r_aux4)
+
+!---------- the l2-norm of the error is
+
+	      r_aux4 = r_aux4 * r_aux4
+	      r_l2nrm= dot_product(r_aux4, r_aux2)
+
+!---------- maximum and minimum
+
+	      r_max  = maxval(r_aux1)
+	      r_min  = minval(r_aux1)
+
+!---------- diffusion and dispersion (not yet implemented)
+
+	      r_diffn= 0.0
+	      r_dispn= 0.0
+
+!---------- print it
+
+	      r_rfm= r_calci/r_rfm0
+	      r_rsm= r_calcs/r_rsm0
+	      write(i_iodiag,1100) GRID_parameters%program_name, GRID_parameters%version, &
+	                           GRID_parameters%subversion, GRID_parameters%patchversion
+	      i_1= p_tinfo%i_step
+	      i_a= p_ghand%i_tnumber
+	      i_b= p_ghand%i_tnumfine
+	      i_2= p_ghand%i_enumber
+	      i_3= p_ghand%i_enumfine
+	      i_4= p_ghand%i_gnumber
+	      i_5= p_ghand%i_gnumfine
+	      i_6= p_ghand%i_nnumber
+	      write(i_iodiag,1000) i_1, i_a, i_b, i_2, i_3, i_4, i_5, i_6, r_min, r_max, &
+	                           r_rfm, r_rsm, r_mxnrm, r_l2nrm, r_diffn, r_dispn, &
+				   r_edgelen_min, r_edgelen_max
+
+!---------- deallocate workspace
+
+	      deallocate(r_aux1, r_aux2, r_aux3, r_aux4, r_arr_edgelength)
+
+!---------- initialization done
+
+	      RETURN
+
+!---------- action quit
+
+	    ELSE IF(c_action == 'quit') THEN action_type
+
+!---------- close diagnostic output file
+
+	      close(i_iodiag)
+ 	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'INFO: Closed file on unit: ', i_iodiag
+
+!---------- action quit done
+
+	      RETURN
+	    END IF action_type
+	  END IF present_act
+
+!---------- action diag (default): allocate workspace
+
+	  i_size= p_ghand%i_nnumber
+	  i_edgelen_size = p_ghand%i_gnumber
+	  allocate(r_aux1(i_size), r_aux2(i_size), r_aux3(i_size), r_aux4(i_size), &
+	           r_arr_edgelength(i_edgelen_size), stat=i_alct)
+	  not_allc: IF(i_alct /= 0) THEN
+	    CALL grid_error(37)
+	  END IF not_allc 
+	  r_aux1= 0.0; r_aux2= 0.0; r_aux3= 0.0; r_aux4= 0.0; r_arr_edgelength=0.0
+
+
+!---------- get the edgelength
+
+	  CALL grid_edgelength(p_ghand, r_edgelen_max, r_edgelen_min, r_arr_edgelength)
+
+
+!---------- calculate reference values, ... extract actual calculated concentration
+
+	  CALL grid_getinfo(p_ghand, i_size, i_valpoint= GRID_tracer, &
+	                    r_nodevalues= r_aux1)
+
+!---------- calculate volume pieces for each node
+
+	  CALL grid_nodevolume(p_ghand, i_size, r_aux2)
+
+!---------- calculate analytical solution
+
+	  r_ts= p_param%phy%r_deltatime* float(p_tinfo%i_step)
+	  CALL slm_analyticsolution(p_ghand, r_ts, i_size, r_aux3)
+
+!---------- now the integral of the concentration (mass) is
+
+	  r_calci= dot_product(r_aux1, r_aux2)
+
+!---------- the integral of the squared concentration ("entropy"(?)) is
+
+	  r_aux4 = r_aux1* r_aux1
+	  r_calcs= dot_product(r_aux4, r_aux2)
+
+!---------- the maximum-norm of the error is
+
+	  r_aux4 = abs(r_aux1- r_aux3)
+	  r_mxnrm= maxval(r_aux4)
+
+!---------- the l2-norm of the error is
+
+	  r_aux4 = r_aux4* r_aux4
+	  r_l2nrm= dot_product(r_aux4, r_aux2)
+
+!---------- maximum and minimum
+
+	  r_max  = maxval(r_aux1)
+	  r_min  = minval(r_aux1)
+
+!---------- diffusion and dispersion (not yet implemented)
+
+	  r_diffn= 0.0
+	  r_dispn= 0.0
+
+!---------- print it
+
+	  r_rfm= r_calci/r_rfm0
+	  r_rsm= r_calcs/r_rsm0
+	  i_1= p_tinfo%i_step
+	  i_2= p_ghand%i_enumber
+	  i_3= p_ghand%i_enumfine
+	  i_4= p_ghand%i_gnumber
+	  i_5= p_ghand%i_gnumfine
+	  i_6= p_ghand%i_nnumber
+	  write(i_iodiag,1000) p_tinfo%i_step, &
+			       p_ghand%i_tnumber, p_ghand%i_tnumfine, &
+	                       p_ghand%i_enumber, p_ghand%i_enumfine, &
+	                       p_ghand%i_gnumber, p_ghand%i_gnumfine, &
+	                       p_ghand%i_nnumber, &
+  			       r_min, r_max, &
+	                       r_rfm, r_rsm, r_mxnrm, r_l2nrm, r_diffn, r_dispn, &
+			       r_edgelen_min, r_edgelen_max
+
+!---------- deallocate workspace
+
+	  deallocate(r_aux1, r_aux2, r_aux3, r_aux4, r_arr_edgelength)
+
+	  RETURN
+ 1000	  FORMAT(1x, i10, 1x, i10, 1x, i10, 1x, i10, 1x, i10, 1x, i10, 1x, i10, 1x, i10, &
+	         1x, e15.8, 1x, e15.8, 1x, e15.8, 1x, e15.8,&
+	         1x, e15.8, 1x, e15.8, 1x, e15.8, 1x, e15.8,&
+		 1x, e15.8, 1x, e15.8)
+ 1010	  FORMAT(a28,i4.4)
+ 1100	  FORMAT(1x,'*******************************************', &
+	            '*******************************************', &
+	            '*******************************************', &
+	            '*******************************************', &
+	            '*******************************************', &
+		    '********************************',/ &
+	         1x,'***** PROGRAM: ',a15,212x,'*****',/ &
+	         1x,'***** VERSION: ',i2.2,'.',i2.2,'.',i2.2,219x,'*****',/ &
+	         1x,'***** Diagnostic output ',218x,'*****',/ &
+	         1x,'*******************************************', &
+	            '*******************************************', &
+	            '*******************************************', &
+	            '*******************************************', &
+		    '*******************************************', &
+	            '********************************',/ &
+	         1x,'* timestep ','    tetras ', &
+	            ' fine tet. ','  elements ', &
+	            '  fine el. ','     edges ', &
+	            '  fine ed. ','     nodes ','        minimum ', &
+	            '        maximum ','            RFM ','            RSM ', &
+                    '       max-norm ','        l2-norm ','      diffusion ', &
+	            '     dispersion ',' edgelength-min ',' edglength-max ','*',/ &
+	         1x,'*******************************************', &
+	            '*******************************************', &
+	            '*******************************************', &
+	            '*******************************************', &
+	            '*******************************************', &
+                    '********************************')
+
+ 1005     FORMAT(1x,'****************************************', &
+	            '****************************************', / &
+	         1x,'* timestep ',i8,'    tetras ',i8, &
+	            ' fine tet. ',i8,'  elements ',i8,'   *', / &
+	         1x,'* fine el. ',i8,'     edges ',i8, &
+	            '  fine ed. ',i8,'     nodes ',i8,'   *', / &
+		 1x,'*        minimum ',e15.8,'        maximum ',e15.8, 16x,'*', / &
+		 1x,'*            RFM ',e15.8,'            RSM ',e15.8, 16x,'*', / &
+		 1x,'*       max-norm ',e15.8,'        l2-norm ',e15.8, 16x,'*', / &
+		 1x,'*      diffusion ',e15.8,'     dispersion ',e15.8, 16x,'*', / &
+	         1x,'****************************************', &
+	            '****************************************')
+
+ 1105	  FORMAT(1x,'****************************************', &
+	            '****************************************',/ &
+	         1x,'***** PROGRAM: ',a15,45x,'*****',/ &
+	         1x,'***** VERSION: ',i2.2,'.',i2.2,'.',i2.2,52x,'*****',/ &
+	         1x,'***** Diagnostic output ',51x,'*****')
+	         
+	  END SUBROUTINE slm_diagnostics
+
+!*****************************************************************
+	  SUBROUTINE slm_initialize(p_ghand, p_param)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), DIMENSION(GRID_timesteps), INTENT(out) :: p_ghand
+	  TYPE (control_struct), INTENT(inout)          :: p_param
+
+	  INTEGER                                     :: i_steps
+	  CHARACTER (len=32)                          :: c_file
+	  CHARACTER (len=28)                          :: c_tmp
+	  INTEGER                                     :: i_tmp, i_cnt
+	  LOGICAL                                     :: l_refined
+	  INTEGER                                     :: i_vertnum
+	  REAL, DIMENSION(:,:), POINTER               :: r_vertinit
+
+!---------- decide whether a new experiment is startet or an old one is continued
+
+	  new_experiment: IF(p_param%phy%i_experiment <= 0) THEN
+
+!---------- reset timesteps (start with 1 in any case)
+
+	    time_one: IF(p_param%phy%i_frsttimestep /= 1) THEN
+	      IF(GRID_parameters%iolog > 0) &
+	        write(GRID_parameters%iolog,*) 'WARNING      : Timestep counters reset due to new experiment'
+	      i_steps= p_param%phy%i_lasttimestep- p_param%phy%i_frsttimestep
+	      p_param%phy%i_frsttimestep= 1
+	      p_param%phy%i_lasttimestep= p_param%phy%i_frsttimestep+ i_steps
+	    END IF time_one
+
+!---------- initialize grid parameters
+
+	    CALL grid_setparameter(p_ghand, i_coarselevel= p_param%phy%i_crslevel, &
+	                           i_finelevel= p_param%phy%i_reflevel)
+
+!---------- define domain, first read data from file (compiled here)
+
+	    CALL grid_readdomain(i_vertnum, r_vertinit, c_readfile=p_param%io%c_domainfile)
+	    CALL grid_definegeometry(i_vertnum, r_vertexarr= r_vertinit)
+
+!---------- create initial triangulation
+
+	    CALL grid_createinitial(p_ghand, c_filename=p_param%io%c_triangfile)
+
+!---------- initialize grid and adapt at steep gradients
+
+	    i_cnt= 0
+	    l_refined= .TRUE.
+	    refine_loop: DO WHILE (l_refined)
+	      CALL slm_initialvalues(p_ghand(i_timeplus))
+	      CALL slm_adapt(p_ghand(i_timeplus), p_param, l_refined, &
+	                     l_water=.FALSE.)
+	    END DO refine_loop
+
+!---------- duplicate grid (old time)
+
+	    CALL grid_timeduplicate(p_ghand(i_timeplus), p_ghand(i_time))
+
+!---------- initialize wind field calculation
+		CALL slm_windinit(p_param)
+
+!---------- if an old experiment is to be continued from stored data:
+
+	  ELSE new_experiment
+
+!---------- create grid from saveset, first compile filename
+
+	    i_tmp= p_param%phy%i_experiment- 1
+	    write(c_tmp,*) trim(GRID_parameters%program_name), '_save.'
+	    write(c_file,1010) trim(c_tmp), i_tmp
+	    c_file= adjustl(c_file)
+
+	    CALL grid_readinitial(p_ghand, c_file)
+
+!---------- initialize wind field calculation
+
+	    CALL slm_windinit(p_param)
+
+	  END IF new_experiment
+
+	  RETURN
+ 1010	  FORMAT(a28,i4.4)
+	  END SUBROUTINE slm_initialize
+
+!*****************************************************************
+	  SUBROUTINE slm_finish(p_ghand, p_param)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (grid_handle), DIMENSION(GRID_timesteps), INTENT(in) :: p_ghand
+	  TYPE (control_struct), INTENT(in)                          :: p_param
+	  CHARACTER (len=32)                                       :: c_file
+	  CHARACTER (len=28)                                       :: c_tmp
+	  INTEGER                                                  :: i_tmp
+
+!---------- open and write saveset, if required
+
+	  save_req: IF(p_param%io%i_savelast /= 0) THEN
+
+	    i_tmp= p_param%phy%i_experiment
+	    write(c_tmp,*) trim(GRID_parameters%program_name), '_save.'
+	    write(c_file,1010) trim(c_tmp), i_tmp
+	    c_file= adjustl(c_file)
+	    CALL grid_writesaveset(c_file, p_ghand)
+
+!---------- write parameter file for next experiment
+
+	    CALL io_putinputfile(p_param)
+	  END IF save_req
+
+!---------- gracefully terminate wind field calculations
+
+CALL slm_windquit
+
+	  RETURN
+ 1010	  FORMAT(a28,i4.4)
+	  END SUBROUTINE slm_finish
+
+!*****************************************************************
+	  SUBROUTINE slm_timestepping(p_ghand, p_param)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  INTEGER, PARAMETER                                          :: i_innermax=15
+	  TYPE (grid_handle), DIMENSION(GRID_timesteps), INTENT(inout) :: p_ghand
+	  TYPE (control_struct), INTENT(inout)                        :: p_param
+	  INTEGER                                                     :: i_timecount
+	  TYPE (sw_info)                                              :: p_time, p_timeaux
+	  LOGICAL                                                     :: l_refined
+	  REAL, DIMENSION(:), ALLOCATABLE                             :: r_tracer
+	  REAL, DIMENSION(:,:), ALLOCATABLE                           :: r_coord
+	  CHARACTER (len=32)                                          :: c_file, c_matfile
+	  CHARACTER (len=28)                                          :: c_tmp
+	  INTEGER                                                     :: i_tmp, &
+	    i_size, i_alct, i_tst, i_fst
+	  INTEGER                                                     :: i_iomatl=21
+	  REAL                                                        :: r_modtime
+          INTEGER                                                     :: i_loopquit
+
+!---------- initialize timestep info structure
+	  p_timestepinfo%i_step       = 0
+	  p_timestepinfo%i_adapit     = 0
+	  p_timestepinfo%l_ploted     = .FALSE.
+	  p_timestepinfo%l_saved      = .FALSE.
+	  p_timestepinfo%r_modeltime  = 0.0
+
+!---------- initialize timing structure
+
+	  p_time%p_tim%r_tim   = 0.0
+	  p_time%p_tim%r_lap   = 0.0
+	  p_time%p_tim%c_tim   = '                '
+	  p_timeaux%p_tim%r_tim= 0.0
+	  p_timeaux%p_tim%r_lap= 0.0
+	  p_timeaux%p_tim%c_tim= '                '
+
+!---------- initialize stop watches
+
+	  CALL stop_watch_init(1,(/'total time      '/),p_timeaux)
+	  CALL stop_watch_init(8,(/'plotting        ', 'grid duplication', &
+	                           'trajectory calc.', 'right hand side ', &
+	                           'grid value updt.', 'grid adaption   ', &
+	                           'diagnostics     ', 'whole timestep  '/), p_time)
+	                           
+!---------- if diagnostics are demanded, initialize diagnostical output
+
+	  IF(p_param%cmd%l_diagnostics) THEN
+	    p_timestepinfo%i_step= 0
+	    CALL slm_diagnostics(p_grid(i_timeplus), p_param, p_timestepinfo, c_action='init')
+	  END IF
+
+!---------- plot initial data
+
+	  i_timecount= 0
+	  IF(p_param%io%l_matlab) THEN
+	    CALL plot_matlab(p_ghand(i_timeplus), i_time=i_timecount, &
+	                     c_action='vals')
+	  END IF
+	  IF(p_param%io%l_gmv) THEN
+	    CALL plot_gmv(p_ghand(i_timeplus), i_time=i_timecount)
+	    CALL generate_vtu(p_ghand(i_timeplus), p_param, i_time=i_timecount)
+	  END IF
+!-- BEGIN added for visnetplot [flo]:
+!-- no IF reqired, because visnet_plot will do nothing,
+!-- if p_param%io%l_visnet = .FALSE.
+!	  i_loopquit= visnet_plot(p_param, p_ghand(i_timeplus), &
+!                                  c_action='plot')
+!-- END
+
+!---------- put out initial information
+
+	  CALL io_putruntimeinfo(p_ghand(i_timeplus), p_timestepinfo, p_time)
+
+!---------- timestep loop
+
+	  CALL stop_watch('start',1,p_timeaux)
+	  CALL stop_watch('start',8,p_time)
+	  time_loop: DO i_timecount= p_param%phy%i_frsttimestep, p_param%phy%i_lasttimestep
+	    p_timestepinfo%i_step  = i_timecount
+	    p_timestepinfo%r_modeltime= p_param%phy%r_deltatime* i_timecount
+	    p_timestepinfo%i_adapit= 0
+
+!---------- duplicate old grid, use it as first guess for new grid
+
+	    CALL stop_watch('start',2,p_time)
+	    CALL grid_timeduplicate(p_ghand(i_time), p_ghand(i_timeplus))
+	    CALL stop_watch('stop ',2,p_time)
+
+!---------- adaptive (inner) loop
+
+	    l_refined= .TRUE.
+	    adap_loop: DO WHILE(l_refined .AND. p_timestepinfo%i_adapit < i_innermax)
+	      p_timestepinfo%i_adapit= p_timestepinfo%i_adapit+ 1
+
+!---------- allocate and extract working arrays
+
+	      i_size= p_ghand(i_timeplus)%i_nnumber
+	      allocate(r_tracer(i_size), r_coord(GRID_dimension,i_size), stat=i_alct)
+	      IF(i_alct /= 0) CALL grid_error(38)
+
+!-SLM--------- do the following SLM calculations in arrays (grid-point-wise)
+
+	      CALL grid_getinfo(p_ghand(i_timeplus), i_size, r_nodecoordinates= r_coord)
+
+!-SLM--------- call the SLM step
+
+	      r_modtime= p_timestepinfo%r_modeltime- p_param%phy%r_deltatime
+	      CALL slm_step(p_ghand, p_param, p_time, r_modtime, i_size, &
+	                    r_coord, r_tracer)
+
+!-SLM--------- update grid data structure and deallocate work arrays
+!-SLM--------- change back from (grid-point)arrays to grid data structure
+
+	      CALL grid_putinfo(p_ghand(i_timeplus), i_size, i_valpoint= GRID_tracer, &
+	                        r_nodevalues= r_tracer)
+
+	      deallocate(r_coord, r_tracer)
+
+!-SLM--------- adapt the grid corresponding to an error estimate
+
+	      CALL stop_watch('start',6,p_time)
+	      CALL slm_adapt(p_ghand(i_timeplus), p_param, l_refined)
+	      CALL stop_watch('stop ',6,p_time)
+
+	    END DO adap_loop
+
+!-SLM--------- insert a full advanced SLM step here, if required
+!-SLM--------- retrieve coordinates of grid points
+
+	    i_size= p_ghand(i_timeplus)%i_nnumber
+	    allocate(r_tracer(i_size), r_coord(GRID_dimension,i_size), stat=i_alct)
+	    IF(i_alct /= 0) CALL grid_error(38)
+
+!-SLM--------- do the following SLM calculations in arrays (grid-point-wise)
+
+	    CALL grid_getinfo(p_ghand(i_timeplus), i_size, r_nodecoordinates= r_coord)
+
+!-SLM--------- call the SLM step
+
+	    r_modtime= p_timestepinfo%r_modeltime- p_param%phy%r_deltatime
+	    CALL slm_astep(p_ghand, p_param, p_time, r_modtime, i_size, &
+	                   r_coord, r_tracer)
+
+!-SLM--------- update grid data structure and deallocate work arrays
+!-SLM--------- change back from (grid-point)arrays to grid data structure
+
+	    CALL grid_putinfo(p_ghand(i_timeplus), i_size, i_valpoint= GRID_tracer, &
+	                      r_nodevalues= r_tracer)
+
+	    deallocate(r_coord, r_tracer)
+
+!---------- diagnostics, if requested
+
+	    IF(p_param%cmd%l_diagnostics) THEN
+	      CALL stop_watch('start',7,p_time)
+	      CALL slm_diagnostics(p_grid(i_timeplus), p_param, p_timestepinfo, c_action='diag')
+	      CALL stop_watch('stop ',7,p_time)
+	    END IF
+
+!---------- plot data (every [i_plotoffset]th timestep)
+
+	    CALL stop_watch('start',1,p_time)
+	    plot_step: IF(mod(i_timecount, p_param%io%i_plotoffset) == 0) THEN
+	      IF(p_param%io%l_matlab) THEN
+	        p_timestepinfo%l_ploted= .TRUE.
+	        CALL plot_matlab(p_ghand(i_timeplus), i_time=i_timecount, &
+	                         c_action='vals')
+	      END IF
+	      IF(p_param%io%l_gmv) THEN
+	        p_timestepinfo%l_ploted= .TRUE.
+	        CALL plot_gmv(p_ghand(i_timeplus), i_time=i_timecount)
+	        CALL generate_vtu(p_ghand(i_timeplus), p_param, i_time=i_timecount)
+	      END IF
+!-- BEGIN added for visnetplot [flo]:
+!	      i_loopquit= visnet_plot(p_param, p_ghand(i_timeplus), &
+!                                      c_action='plot')
+!-- END
+	    END IF plot_step
+	    CALL stop_watch('stop ',1,p_time)
+
+!---------- put a saveset to disc every ... timesteps
+
+	    save_step: IF((mod(i_timecount, p_param%io%i_saveoffset) == 0) .AND. &
+	                  (i_timecount > 1)) THEN
+	      i_tmp= p_param%phy%i_experiment
+ 	      write(c_tmp,*) trim(GRID_parameters%program_name), '_save.'
+	      write(c_file,1010) trim(c_tmp), i_tmp
+	      c_file= adjustl(c_file)
+	      CALL grid_writesaveset(c_file,p_ghand)
+	      p_timestepinfo%l_saved= .TRUE.
+	    END IF save_step
+
+!---------- runtime information output
+
+	    CALL stop_watch('stop ',8,p_time)
+	    CALL io_putruntimeinfo(p_ghand(i_timeplus), p_timestepinfo, p_time)
+	    CALL stop_watch_init(8,(/'plotting        ', 'grid duplication', &
+	                             'trajectory calc.', 'right hand side ', &
+	                             'grid value updt.', 'grid adaption   ', &
+	                             'diagnostics     ', 'whole timestep  '/), p_time)
+	    CALL stop_watch('start',8,p_time)
+
+!---------- remove obsolecent grid items
+
+	    CALL grid_sweep
+
+!---------- toggle time handles for next step if gfx-proces has not exited
+
+	    CALL grid_timetoggle
+
+!---------- exit loop if graphics process has been terminated
+
+!            IF (i_loopquit /= 0) EXIT time_loop
+
+	  END DO time_loop
+	  CALL stop_watch('stop ',1,p_timeaux)
+
+!---------- print total time
+
+ 	  write(GRID_parameters%ioout,1005)
+	  write(GRID_parameters%ioout,1003) p_timeaux%p_tim(1)%r_tim
+	  write(GRID_parameters%ioout,1004)
+	  IF(GRID_parameters%iolog > 0) THEN
+	    write(GRID_parameters%iolog,1003) p_timeaux%p_tim(1)%r_tim
+	  END IF
+
+!---------- terminate diagnostics
+
+	  IF(p_param%cmd%l_diagnostics) THEN
+	    CALL slm_diagnostics(p_grid(i_timeplus), p_param, p_timestepinfo, c_action='quit')
+	  END IF
+
+	  RETURN
+ 1000	  FORMAT(1x,'***** ***** ***** ***** ***** ***** ***** ***** ***** *****',/ &
+	         1x,'*****            Runtime Information Output           *****',/ &
+	         1x,'***** ----- ----- ----- ----- ----- ----- ----- ----- *****')
+ 1003	  FORMAT(1x,'***** Total time for timesteps ',10x,e12.4,' *****')
+ 1004	  FORMAT(1x,'***** ***** ***** ***** ***** ***** ***** ***** ***** *****',/)
+ 1005	  FORMAT(1x,'***** ***** ***** ***** ***** ***** ***** ***** ***** *****',/ &
+	         1x,'*****             Final Information Output            *****',/ &
+	         1x,'***** ----- ----- ----- ----- ----- ----- ----- ----- *****')
+ 1010	  FORMAT(a28,i4.4)
+ 
+ 
+	  END SUBROUTINE slm_timestepping
+
+	END MODULE ADV_semilagrange
