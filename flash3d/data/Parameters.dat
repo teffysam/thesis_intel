@@ -12,7 +12,7 @@ FINE_GRID_LEVEL
 17
 # minimum level of refinements                    [integer]
 COARSE_GRID_LEVEL
-7
+5
 # tolerance for refinement                        [real]
 TOLERANCE_OF_REFINEMENT
 0.001

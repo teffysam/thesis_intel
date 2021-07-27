@@ -1,7 +1,10 @@
 {
     "git.ignoreLimitWarning": true,
-    "editor.fontFamily": " 'Monospace'",
+    "editor.fontFamily": " 'cascadia code'",
     "C_Cpp.default.customConfigurationVariables": {},
-    "debug.console.fontFamily": "'BitStreamVeraSansMono Nerd Font Mono'",
-    "terminal.integrated.fontFamily": "'BitStreamVeraSansMono Nerd Font Mono'"
+    "debug.console.fontFamily": "'Hack'",
+    "terminal.integrated.fontFamily": "'cascadia code'",
+    "editor.fontSize": 13,
+    "customizeUI.font.monospace": "cascadia code",
+    "customizeUI.font.regular": "inter"
 }

@@ -121,8 +121,7 @@
 	  END IF data_read
 !---------- interpolate to coordinate
 	!   write(*,*) r_coord
-	  r_field= data_interpol(r_coord,i_timeinterval) !!TODO check here for flipping
-	  														!!Welcome back :)
+	  r_field= data_interpol(r_coord,i_timeinterval) !!TODO check here for flipping															!!Welcome back :)
 	  RETURN
  1000	  FORMAT(i3.3)
 	  END FUNCTION slm_windfield
@@ -262,7 +261,7 @@
 
 
 	  !READ TIME
-	  c_filename='/pool/testu_rdr'
+	  c_filename='/pool/testu'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -314,7 +313,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 
 		!   OPEN VVEL
-		c_filename='/pool/testv_rdr'
+		c_filename='/pool/testv'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -334,7 +333,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 
 	!   OPEN WVEL
-		c_filename='/pool/testw_rdr'
+		c_filename='/pool/testw'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -482,7 +481,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  
 	  
 
-	  c_filename= '/pool/agulhas_grid_rdr.cdf'
+	  c_filename= '/pool/agulhas_grid.cdf'
 !---------- open current file
 
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
@@ -746,27 +745,27 @@ i_timesteps=1
 	  END IF
 
 	  determine_height: DO i_cnt=1, i_z-1
-	    IF(r_z(i_cnt) >= r_coord(3) .AND. r_z(i_cnt +1) <= r_coord(3)) THEN
+	    IF(r_zw(i_cnt) <= r_coord(3) .AND. r_zw(i_cnt +1) >= r_coord(3)) THEN
 	        i_loz= i_cnt
 	        i_hiz= i_cnt+1
 	        exit determine_height
 	    END IF
 	  END DO determine_height
-	  IF(r_z(i_z) >= r_coord(3)) THEN
-	    i_loz = i_z
-	    i_hiz = i_z-1
+	  IF(r_zw(i_z) <= r_coord(3)) THEN
+	    i_loz = i_z-1
+	    i_hiz = i_z
 	  END IF
 
 	  determine_heightw: DO i_cnt=1, i_z-1
-	    IF(r_zw(i_cnt) >= r_coord(3) .AND. r_zw(i_cnt +1) <= r_coord(3)) THEN
+	    IF(r_zw(i_cnt) <= r_coord(3) .AND. r_zw(i_cnt +1) >= r_coord(3)) THEN
 	        i_lozz= i_cnt
 	        i_hizz= i_cnt+1
 	        exit determine_heightw
 	    END IF
 	  END DO determine_heightw
-	  IF(r_zw(i_z) >= r_coord(3)) THEN
-	    i_lozz = i_z
-	    i_hizz = i_z-1
+	  IF(r_zw(i_z) <= r_coord(3)) THEN
+	    i_lozz = i_z-1
+	    i_hizz = i_z
 	  END IF
 !TODO fix this problem tommorow:fixed
 !---------- calculate weights for bilinear interpolation
@@ -779,8 +778,8 @@ i_timesteps=1
 	  r_dvy= r_latv(i_hivy)- r_latv(i_lovy)
 	  r_dwy= r_latw(i_hiwy)- r_latw(i_lowy)
 
-	  r_dz=  r_z(i_hiz) -  r_z(i_loz) 
-	  r_dwz=  r_zw(i_hizz) - r_zw(i_lozz) 
+	  r_dz= r_z(i_hiz)- r_z(i_loz)
+	  r_dwz= r_zw(i_hizz)- r_zw(i_lozz)
 
 	  r_lux= r_coord(1) - r_lonu(i_loux)
 	  r_lvx= r_coord(1) - r_lonv(i_lovx)
@@ -788,8 +787,8 @@ i_timesteps=1
 	  r_luy= r_coord(2) - r_latu(i_louy)
 	  r_lvy= r_coord(2) - r_latv(i_lovy)
 	  r_lwy= r_coord(2) - r_latw(i_lowy)
-	  r_lz= r_z(i_loz) - r_coord(3) 
-	  r_lzz=  r_zw(i_lozz) - r_coord(3) 
+	  r_lz= r_coord(3) - r_z(i_loz)
+	  r_lzz= r_coord(3) - r_zw(i_lozz)
 
 	  r_hux= r_lonu(i_hiux) - r_coord(1)
 	  r_hvx= r_lonv(i_hivx) - r_coord(1)
@@ -797,9 +796,8 @@ i_timesteps=1
 	  r_huy= r_latu(i_hiuy) - r_coord(2)
 	  r_hvy= r_latv(i_hivy) - r_coord(2)
 	  r_hwy= r_latw(i_hiwy) - r_coord(2)
-	  r_hz=   r_coord(3) -r_z(i_hiz) 
-	  r_hzz=   r_coord(3) - r_zw(i_hizz) 
-	!   write (*,*) r_hz, r_hzz
+	  r_hz= r_z(i_hiz) - r_coord(3)
+	  r_hzz= r_zw(i_hizz) - r_coord(3)
 
 	  r_scalx= r_deg * 1./cos(r_coord(2)*PI/180.)  ! in degree/sec
 	  r_scaly= r_deg

@@ -1,3 +1,4 @@
+# 1 "/home/teffy/thesis_intel/flash3d/src/options/ADV_wind.agulhas.tstep.copy_zflip.f90"
 !*****************************************************************
 !
 ! MODULE NAME:
@@ -52,12 +53,12 @@
 	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowy
 	  REAL, DIMENSION(:,:,:,:), ALLOCATABLE :: r_flowz
 
-	  !REAL, DIMENSION(100,50,23,1) :: r_flowx, r_flowy, r_flowz
+!REAL, DIMENSION(100,50,23,1) :: r_flowx, r_flowy, r_flowz
 
-	!   REAL, DIMENSION(501)  :: r_latu, r_latv, r_latw
-	!   REAL, DIMENSION(1101) :: r_lonu, r_lonv, r_lonw
-	!   REAL, DIMENSION(23) :: r_z, r_zw
-	!   REAL				  :: r_time
+!   REAL, DIMENSION(501)  :: r_latu, r_latv, r_latw
+!   REAL, DIMENSION(1101) :: r_lonu, r_lonv, r_lonw
+!   REAL, DIMENSION(23) :: r_z, r_zw
+!   REAL				  :: r_time
 	  REAL, DIMENSION(:), ALLOCATABLE     :: r_latu
 	  REAL, DIMENSION(:), ALLOCATABLE     :: r_lonu
 	  REAL, DIMENSION(:), ALLOCATABLE     :: r_latv
@@ -90,10 +91,10 @@
 	  CHARACTER (LEN=3)                           :: c_num
 	  INTEGER                                     :: i_iost, i_cnt, j_cnt
 	  
-	!   CHARACTER (LEN=io_fillen) :: c_name
+!   CHARACTER (LEN=io_fillen) :: c_name
 
 
-	!   c_name= p_control%io%c_windfile
+!   c_name= p_control%io%c_windfile
 !---------- set time
 
 	  IF(present(r_time)) THEN
@@ -103,12 +104,12 @@
 	  END IF
 	  
 
-	  !!!! i_timeinterval needs to PREDEFINED to ONE! This is passed into data_interpol
+!!!! i_timeinterval needs to PREDEFINED to ONE! This is passed into data_interpol
 	  i_timeinterval=1
 !---------- decide, if data has to be read
 	  data_read: IF(r_readlast <= r_tim) THEN
 
-		   !!!!! Try reading here
+!!!!! Try reading here
 	  CALL read_netcdf_currents(r_tim)
 !---------- update values for next open
 	  
@@ -116,13 +117,12 @@
 	
 	
 	
-		!  This NEEDS to be SWITCHED OFF
-		!    i_timeinterval= i_timeinterval+ 1
+!  This NEEDS to be SWITCHED OFF
+!    i_timeinterval= i_timeinterval+ 1
 	  END IF data_read
 !---------- interpolate to coordinate
-	!   write(*,*) r_coord
-	  r_field= data_interpol(r_coord,i_timeinterval) !!TODO check here for flipping
-	  														!!Welcome back :)
+!   write(*,*) r_coord
+	  r_field= data_interpol(r_coord,i_timeinterval) !!TODO check here for flipping															!!Welcome back :)
 	  RETURN
  1000	  FORMAT(i3.3)
 	  END FUNCTION slm_windfield
@@ -136,7 +136,7 @@
       INCLUDE "netcdf.inc"
       
       
-!---------- input parameters      
+!---------- input parameters
 	  CHARACTER (LEN=80) :: c_filename
 !---------- local variables
 	  INTEGER         :: i_alct, i_ncstat
@@ -184,7 +184,7 @@
 ! !	  ALLOCATE( r_latu(i_lat), r_lonv(i_lon), r_lonw(i_lon), &
 ! !	    		r_lonu(i_lon), r_latv(i_lat), r_latw(i_lat), &
 ! !	    		r_z(i_z), r_zw(i_z), r_time(i_timesteps), stat= i_alct)
-! !	 !rite(*,*) i_alct 
+! !	 !rite(*,*) i_alct
 ! !      IF(i_alct /= 0) &
 ! !	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate lat/lon/z/time field')
 ! !---------- read lat/long/height/time coordinate values
@@ -261,8 +261,8 @@
 		
 
 
-	  !READ TIME
-	  c_filename='/pool/testu_rdr'
+!READ TIME
+	  c_filename='/pool/testu'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -278,7 +278,7 @@
 	  write(*,*) r_tim,r_ttim
 startA(1)=r_ttim+1
 countA(1)=i_timesteps
-!write(*,*) startA, countA 
+!write(*,*) startA, countA
 	  i_ncstat= nf_get_vara_real(i_fileid, i_varid, startA, countA, r_time)
 !write(*,*) i_ncstat
 	  IF(i_ncstat /= NF_NOERR) &
@@ -297,7 +297,7 @@ countB(2)=i_lat
 countB(3)=i_z
 countB(4)=i_timesteps
 
-		!OPEN UVEL
+!OPEN UVEL
       i_ncstat= nf_inq_varid(i_fileid, 'UVEL', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
@@ -313,8 +313,8 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 
 
-		!   OPEN VVEL
-		c_filename='/pool/testv_rdr'
+!   OPEN VVEL
+		c_filename='/pool/testv'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -333,8 +333,8 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 
 
-	!   OPEN WVEL
-		c_filename='/pool/testw_rdr'
+!   OPEN WVEL
+		c_filename='/pool/testw'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -366,7 +366,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	END DO
 !-----------set timeinterval length between winddata (Timeformat here: yymmdd,ddd)
 
-	  !r_intervallen= (r_time(2) - r_time(1))*24*60*60
+!r_intervallen= (r_time(2) - r_time(1))*24*60*60
 	  r_intervallen= 86400 !r_time(2) - r_time(1)
 
 !---------- close currents file
@@ -400,7 +400,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
       IF(i_alct /= 0) &
 	    CALL grid_error(c_error='[time_interpol]: could not allocate windfields r_fx, r_fy, r_fz')
 
-!---------- initialize 
+!---------- initialize
 
 	  i_tint = i_timeinterval+1
 	  r_t = 0.0
@@ -426,9 +426,9 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 !---------- Reallocate Windfields with new shape
 
-	!  DEALLOCATE(r_flowx, r_flowy, r_flowz)
-	!  ALLOCATE(r_flowx(i_lon,i_lat,i_z,i_tend-i_tstart+1),r_flowy(i_lon,i_lat,i_z,i_tend-i_tstart+1),&
-	!    &r_flowz(i_lon,i_lat,i_z,i_tend-i_tstart+1) ,stat= i_alct)
+!  DEALLOCATE(r_flowx, r_flowy, r_flowz)
+!  ALLOCATE(r_flowx(i_lon,i_lat,i_z,i_tend-i_tstart+1),r_flowy(i_lon,i_lat,i_z,i_tend-i_tstart+1),&
+!    &r_flowz(i_lon,i_lat,i_z,i_tend-i_tstart+1) ,stat= i_alct)
       IF(i_alct /= 0) &
 	    CALL grid_error(c_error='[time_interpol]: could not allocate windfields r_flowx, r_flowy, r_flowz')
 
@@ -454,25 +454,25 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 
 	  
-	!  TYPE (rt_info), INTENT(inout)	    :: p_tinfo
+!  TYPE (rt_info), INTENT(inout)	    :: p_tinfo
 	  
 
 !---------- initialize
 
 	  
-	 ! write (*,*) p_tinfo%i_step
+! write (*,*) p_tinfo%i_step
 
 !---------- read current data from NetCDF file
 
 ! This is moved into windfield into the IF loop
 !	  CALL read_netcdf_currents(c_name,p_tinfo)
 
-	  !!!! Moved vars that are constant from read_netcdf_currents
+!!!! Moved vars that are constant from read_netcdf_currents
 	  
       
       
       
-!---------- input parameters  
+!---------- input parameters
 	  TYPE (control_struct)     :: p_control    
 	  CHARACTER (LEN=80)  :: c_filename
 !---------- local variables
@@ -482,7 +482,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  
 	  
 
-	  c_filename= '/pool/agulhas_grid_rdr.cdf'
+	  c_filename= '/pool/agulhas_grid.cdf'
 !---------- open current file
 
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
@@ -524,7 +524,7 @@ i_timesteps=1
 	  ALLOCATE( r_latu(i_lat), r_lonv(i_lon), r_lonw(i_lon), &
 	    		r_lonu(i_lon), r_latv(i_lat), r_latw(i_lat), &
 	    		r_z(i_z), r_zw(i_z), r_time(i_timesteps), stat= i_alct)
-	 !write(*,*) i_alct 
+!write(*,*) i_alct
      IF(i_alct /= 0) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not allocate lat/lon/z/time field')
 !---------- read lat/long/height/time coordinate values
@@ -588,7 +588,7 @@ i_timesteps=1
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
 
-	! Close the grid file
+! Close the grid file
 	  i_ncstat= nf_close(i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
@@ -732,7 +732,7 @@ i_timesteps=1
 	    i_lovx = i_lon-1
 	    i_hivx = i_lon
 	  END IF
-	!TODO read lat lon from matlab properly 
+!TODO read lat lon from matlab properly
 	  determine_lonw: DO i_cnt=1, i_lon-1
 	    IF(r_lonw(i_cnt) <= r_coord(1) .AND. r_lonw(i_cnt +1) >= r_coord(1)) THEN
 	        i_lowx= i_cnt
@@ -746,27 +746,27 @@ i_timesteps=1
 	  END IF
 
 	  determine_height: DO i_cnt=1, i_z-1
-	    IF(r_z(i_cnt) >= r_coord(3) .AND. r_z(i_cnt +1) <= r_coord(3)) THEN
+	    IF(r_zw(i_cnt) <= r_coord(3) .AND. r_zw(i_cnt +1) >= r_coord(3)) THEN
 	        i_loz= i_cnt
 	        i_hiz= i_cnt+1
 	        exit determine_height
 	    END IF
 	  END DO determine_height
-	  IF(r_z(i_z) >= r_coord(3)) THEN
-	    i_loz = i_z
-	    i_hiz = i_z-1
+	  IF(r_zw(i_z) <= r_coord(3)) THEN
+	    i_loz = i_z-1
+	    i_hiz = i_z
 	  END IF
 
 	  determine_heightw: DO i_cnt=1, i_z-1
-	    IF(r_zw(i_cnt) >= r_coord(3) .AND. r_zw(i_cnt +1) <= r_coord(3)) THEN
+	    IF(r_zw(i_cnt) <= r_coord(3) .AND. r_zw(i_cnt +1) >= r_coord(3)) THEN
 	        i_lozz= i_cnt
 	        i_hizz= i_cnt+1
 	        exit determine_heightw
 	    END IF
 	  END DO determine_heightw
-	  IF(r_zw(i_z) >= r_coord(3)) THEN
-	    i_lozz = i_z
-	    i_hizz = i_z-1
+	  IF(r_zw(i_z) <= r_coord(3)) THEN
+	    i_lozz = i_z-1
+	    i_hizz = i_z
 	  END IF
 !TODO fix this problem tommorow:fixed
 !---------- calculate weights for bilinear interpolation
@@ -779,8 +779,8 @@ i_timesteps=1
 	  r_dvy= r_latv(i_hivy)- r_latv(i_lovy)
 	  r_dwy= r_latw(i_hiwy)- r_latw(i_lowy)
 
-	  r_dz=  r_z(i_hiz) -  r_z(i_loz) 
-	  r_dwz=  r_zw(i_hizz) - r_zw(i_lozz) 
+	  r_dz= r_z(i_hiz)- r_z(i_loz)
+	  r_dwz= r_zw(i_hizz)- r_zw(i_lozz)
 
 	  r_lux= r_coord(1) - r_lonu(i_loux)
 	  r_lvx= r_coord(1) - r_lonv(i_lovx)
@@ -788,8 +788,8 @@ i_timesteps=1
 	  r_luy= r_coord(2) - r_latu(i_louy)
 	  r_lvy= r_coord(2) - r_latv(i_lovy)
 	  r_lwy= r_coord(2) - r_latw(i_lowy)
-	  r_lz= r_z(i_loz) - r_coord(3) 
-	  r_lzz=  r_zw(i_lozz) - r_coord(3) 
+	  r_lz= r_coord(3) - r_z(i_loz)
+	  r_lzz= r_coord(3) - r_zw(i_lozz)
 
 	  r_hux= r_lonu(i_hiux) - r_coord(1)
 	  r_hvx= r_lonv(i_hivx) - r_coord(1)
@@ -797,9 +797,8 @@ i_timesteps=1
 	  r_huy= r_latu(i_hiuy) - r_coord(2)
 	  r_hvy= r_latv(i_hivy) - r_coord(2)
 	  r_hwy= r_latw(i_hiwy) - r_coord(2)
-	  r_hz=   r_coord(3) -r_z(i_hiz) 
-	  r_hzz=   r_coord(3) - r_zw(i_hizz) 
-	!   write (*,*) r_hz, r_hzz
+	  r_hz= r_z(i_hiz) - r_coord(3)
+	  r_hzz= r_zw(i_hizz) - r_coord(3)
 
 	  r_scalx= r_deg * 1./cos(r_coord(2)*PI/180.)  ! in degree/sec
 	  r_scaly= r_deg
@@ -811,13 +810,13 @@ i_timesteps=1
 ! Interpolate V in two XZ planes to final V point
 ! Interpolate U in two YZ planes to final U point
 ! Interpolate W in two XY planes to final W point
-! The section below is split into three: 
-		!r_xun represents the YZ plane first phase (technically
-		!should be named r_yun but is left as is for ease of use
-		!r_xvn represents the XZ plane first phase (correct
-		!representation)
-		!r_xwn represents the XY plane first phase (technically
-		!should be named r_zwn but " ") 
+! The section below is split into three:
+!r_xun represents the YZ plane first phase (technically
+!should be named r_yun but is left as is for ease of use
+!r_xvn represents the XZ plane first phase (correct
+!representation)
+!r_xwn represents the XY plane first phase (technically
+!should be named r_zwn but " ")
 	  IF(r_duy /= 0.0) THEN
 	    r_dyui= 1./r_duy
 	    r_xu1= (r_huy* r_flowx(i_loux, i_louy, i_loz, i_time)+ &
