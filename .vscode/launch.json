@@ -19,7 +19,7 @@
             "cwd": "${workspaceFolder}",
             // "environment": [
             //     {
-            //         "name": "LD_PRELOAD",
+            //         "name": "LD_PRELOAD",2
             //         "value": "/usr/lib/gcc/x86_64-pc-linux-gnu/4.8.5/libgfortran.so.3"
             //     }
             // ],
