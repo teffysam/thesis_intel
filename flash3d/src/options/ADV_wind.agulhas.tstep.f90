@@ -788,6 +788,7 @@ i_timesteps=1
 	  r_luy= r_coord(2) - r_latu(i_louy)
 	  r_lvy= r_coord(2) - r_latv(i_lovy)
 	  r_lwy= r_coord(2) - r_latw(i_lowy)
+	  !!!! These two lines below fixes vertical ocean !!!!!!
 	  r_lz= r_z(i_loz) - r_coord(3) 
 	  r_lzz=  r_zw(i_lozz) - r_coord(3) 
 
