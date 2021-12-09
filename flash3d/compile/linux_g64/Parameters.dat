@@ -15,25 +15,25 @@ COARSE_GRID_LEVEL
 8
 # tolerance for refinement                        [real]
 TOLERANCE_OF_REFINEMENT
-0.003
+0.001
 # tolerance for coarsening                        [real]
 TOLERANCE_OF_COARSENING
 0.001
 # watermark for refinement                        [real]
 WATERMARK_OF_REFINEMENT
-0.0001
+0.001
 # watermark for coarsening                        [real]
 WATERMARK_OF_COARSENING
-0.0001
+0.001
 # timestep length                                 [real]
 TIMESTEP_LENGTH
-600.
+86400.
 # first timestep                                  [integer]
 BEGINNING_TIMESTEP
 1
 # last timestep                                   [integer]
 FINISHING_TIMESTEP
-60
+20
 # plot in matlab style to file (no plot = 0)      [integer]
 MATLAB_PLOTTING
 0
@@ -42,10 +42,10 @@ GMV_FILE_PLOTTING
 1
 # plot in VisNET window (no plot = 0)             [integer]
 VISNET_PLOTTING
-1
+0
 # screenshot VisNET window (no plot = 0)          [integer]
 VISNET_SCREENSHOT
-1
+0
 # timesteps between plots                         [integer]
 STEPS_BTW_PLOTS
 1

@@ -254,7 +254,7 @@
 
 	  ALLOCATE( r_flowx(i_lon, i_lat, i_z, i_timesteps), r_flowy(i_lon, i_lat, i_z, i_timesteps),&
 	    & r_flowz(i_lon, i_lat, i_z, i_timesteps), stat= i_alct, errmsg=my_errmsg)
-	write(*,*) i_alct, my_errmsg
+	! write(*,*) i_alct, my_errmsg
      IF(i_alct /= 0) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not allocate currents fields')
 		
@@ -274,7 +274,7 @@
 	  IF(r_tim .ne. 0) THEN 
 		r_ttim=r_tim/86400
 	  END IF
-	  write(*,*) r_tim,r_ttim
+	!   write(*,*) r_tim,r_ttim
 startA(1)=r_ttim+1
 countA(1)=i_timesteps
 !write(*,*) startA, countA 
@@ -302,7 +302,7 @@ countB(4)=i_timesteps
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
 	 
 		i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowx)
-write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
+! write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not read var131 data')
 		
@@ -575,7 +575,7 @@ i_timesteps=1
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
 	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_z)
 	  r_z=r_z/1000
-	  write(*,*) r_z
+	!   write(*,*) r_z
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
 

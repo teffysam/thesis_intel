@@ -76,11 +76,11 @@
 !---------- Simple Criteria for injecting tracer
 	!   write(*,*) i_cnt, r_coord(:,i_cnt), r_field(1), r_time
 	!   IF (r_coord(1,i_cnt) .gt. 27.0 ) THEN
-		IF (0.5e-5 < r_field(1) .AND. r_time .LE. 86400) THEN
-		
+		IF (0.5e-5 < r_field(1) .AND. 0.5e-5 < r_field(1) .AND. r_time .LE. 86400) THEN
+			r_rhs =  1e7
 		!  write(*,*) r_coord(1,i_cnt)
-		r_rhs =  1e7 !make this time dependent, need to stop pumping tracer into this 
-	  ELSE
+		ELSE
+			 !make this time dependent, need to stop pumping tracer into this 
 	    r_rhs= 0.0
 	  END IF
 	  

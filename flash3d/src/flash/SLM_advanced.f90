@@ -173,6 +173,7 @@
 
 	  CALL stop_watch('start',5,p_time)
 	  CALL slm_aupdate(p_param, i_size, r_coord, r_newvl, r_tracer, r_time=r_modtime)
+	!   write(*,*) r_tracer
 	  CALL stop_watch('stop ',5,p_time)
 
 !-SLM--------- put alpha values to u and v field entries
@@ -268,8 +269,10 @@
 	  END IF
 
 	  main_loop: DO i_cnt=1, i_arlen
-	    ! r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(p_param,r_coord(:,i_cnt),i_cnt,r_tim)
-	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(p_param,r_coord(:,i_cnt),r_tim),r_coord(:,i_cnt),i_cnt,r_time)
+	    ! r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
+	  r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(p_param,r_coord(:,i_cnt),r_tim),r_coord(:,i_cnt),i_cnt,r_time)
+	!   r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* 1
+		! write(*,*) r_udate(i_cnt)
 	  END DO main_loop
 
 	  RETURN

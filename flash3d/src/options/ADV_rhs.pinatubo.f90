@@ -102,6 +102,7 @@
 
 	  IF (r_dist <= r_radius .AND. r_coord(3) >= r_centr(3) .AND. r_coord(3) <= r_top) THEN
 	    r_rhs = time_dependent_rhs(p_param,r_tim,r_radius,r_high)
+		! r_rhs = 1e7
 	  ELSE
 	    r_rhs= 0.0
 	  END IF

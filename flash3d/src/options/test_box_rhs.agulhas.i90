@@ -1,0 +1,142 @@
+# 1 "/scratch/cen/numgeo/teffy/thesis_intel/flash3d/src/options/test_box_rhs.agulhas.f90"
+!*****************************************************************
+!
+! MODULE NAME:
+!	ADV_rhs
+! FUNCTION:
+!	calculate the (nonhomogeneous) right hand side
+! CONTAINS:
+!-----------------------------------------------------------------
+!
+! NAME:
+!	slm_righthand
+! FUNCTION:
+!	calculate the rhs of the advection equation
+! SYNTAX:
+!	real= slm_righthand(real.arr, real)
+! ON INPUT:
+!	r_coord: coordinates of point		real
+!	r_time:  time coordinate (optional)	real
+! ON OUTPUT:
+!	r_rhs:   right hand side value		real
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! NAME:
+!	time_dependent_rhs
+! FUNCTION:
+!	calculate time dependent rhs
+! SYNTAX:
+!	real= time_dependent_rhs(real)
+! ON INPUT:
+!	r_time:  time coordinate	real
+! ON OUTPUT:
+!	r_rhs:   right hand side value		real
+! CALLS:
+!
+! COMMENTS:
+!
+!-----------------------------------------------------------------
+!
+! PUBLIC:
+!
+! COMMENTS:
+!	this is the homogeneous case!
+! USES:
+!	MISC_globalparam, MISC_error
+! LIBRARIES:
+!
+! REFERENCES:
+!
+! VERSION(S):
+!	1. original version		j. behrens	2/98
+!	2. compliant to amatos 1.0	j. behrens	12/2000
+!	3. nonhomogeneous, time dependent rhs	e. gerwing	4/2015
+!
+!*****************************************************************
+	MODULE ADV_rhs
+	  USE FLASH_parameters
+	  USE GRID_api
+	  USE date_time
+	  PRIVATE
+	  PUBLIC :: slm_righthand
+	  CONTAINS
+!*****************************************************************
+	  FUNCTION slm_righthand(p_param,r_coord, r_time) RESULT (r_rhs)
+
+!---------- local declarations
+
+	  IMPLICIT NONE
+
+	  TYPE (control_struct), INTENT(in)           :: p_param
+	  REAL, DIMENSION(GRID_dimension), INTENT(in) :: r_coord
+	  REAL, INTENT(in), OPTIONAL                  :: r_time
+	  REAL                                        :: r_rhs
+	  REAL                                        :: r_tim
+	  REAL                                        :: r_radius, r_dist, r_dist1, r_dist2
+	  REAL, DIMENSION(GRID_dimension)             :: r_centr, r_centr1, r_centr2, r_vec, r_vec1, r_vec2
+
+!---------- set time
+
+	  IF(present(r_time)) THEN
+	    r_tim= r_time
+	  ELSE
+	    r_tim= 0.0
+	  END IF
+
+!---------- initilize coordinates of emission source (cylinder)
+!   r_centr(1) = 22.9999                      ! x-Position [degree]
+!   r_centr(2) = -40.4999                            ! y-Position [degree]
+!   r_centr(3) = 0.001                             ! bottom of ash column (above sealevel) [km]
+!   r_top = 0.003                                  ! top of ash column (above sealevel) [km]
+!   r_radius = 6.003                        ! Radius [degree]
+
+!   r_vec = r_coord -r_centr                      ! Vector between center and coordinate
+!   r_dist = sqrt(dot_product(r_vec(1:2),r_vec(1:2)))      ! Distance between center and (x,y) [degree]
+
+!   r_high = r_top - r_centr(3)                   ! ash cloud thickness
+! Big cuboid domain is 44S to 25S and 0E to 45E with three tracer sections
+!----------- initialise coordinated for ball injection (sphere)
+	  r_centr(1) =	20.5999                   ! x-Position [degree]
+	  r_centr(2) = -37.9999				 ! y-Position [degree]
+	  r_centr(3) =	3.001  						! km
+!   r_centr1(1) =	30.5999                   ! x-Position [degree]
+!   r_centr1(2) = -30.9999				 ! y-Position [degree]
+!   r_centr1(3) =	3.001  						! km
+!   r_centr2(1) =	40.5999                   ! x-Position [degree]
+!   r_centr2(2) = -36.9999				 ! y-Position [degree]
+!   r_centr2(3) =	3.001  						! km
+	  r_vec = r_coord - r_centr					! Vector between center and coordinate
+!   r_vec1 = r_coord - r_centr1					! Vector between center and coordinate
+!   r_vec2 = r_coord - r_centr2					! Vector between center and coordinate
+	  r_dist = sqrt(dot_product(r_vec(1:3),r_vec(1:3)))      ! Distance between center and (x,y,z) [degree]
+!   r_dist1 = sqrt(dot_product(r_vec1(1:3),r_vec1(1:3)))      ! Distance between center and (x,y,z) [degree]
+!   r_dist2 = sqrt(dot_product(r_vec2(1:3),r_vec2(1:3)))      ! Distance between center and (x,y,z) [degree]
+
+!---------- calculate the advection at (x,y) (velocity increasing)
+! Condition is simple: calc distance between coord from centre of sphere, if within centre of sphere tracer injected, if not, oh well
+! TODO: Analytic: calc distance from my spec ball 35S 26E, 1 degree radius; convert to km?
+! insert time condition too
+	  IF (r_dist .LE. 5 .AND. r_coord(3) .EQ. 3 .AND. r_time .LE. 86400 ) THEN
+!   IF (r_coord(1) .GE. 20 .AND. r_coord(1) .LE. 24 .AND. r_coord(3) .GE. 2 .AND. r_time .LE. 86400) THEN
+!   IF (r_coord(1) .EQ. 20.5 .AND. r_coord(2) .EQ. -37.5 .AND. r_coord(3) .EQ. 3 .AND. r_time .LE. 86400) THEN
+	    	r_rhs = 1e+30
+!   ELSE IF( r_dist1 .LE. 5 .AND. r_time .LE. 86400 ) THEN
+!     r_rhs = 1e6
+!   ELSE IF( r_dist2 .LE. 5 .AND. r_time .LE. 86400 ) THEN
+!     r_rhs = 1e6
+	  ELSE
+	  		r_rhs = 0.0
+	  END IF
+	  
+
+	  RETURN
+	  END FUNCTION slm_righthand
+
+!*****************************************************************
+	  
+!*****************************************************************
+	END MODULE ADV_rhs

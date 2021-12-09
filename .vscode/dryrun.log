@@ -1,0 +1,6 @@
+make -f "/scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/" --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/scratch/cen/numgeo/teffy/thesis_intel'
+make: Leaving directory '/scratch/cen/numgeo/teffy/thesis_intel'
+ 
+make: *** /scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/: Is a directory.  Stop.
+ 

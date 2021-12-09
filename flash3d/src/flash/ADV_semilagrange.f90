@@ -176,6 +176,7 @@
 !---------- set coarsening/refinement criterion
 
 	  r_errmx= maxval(r_aux1(1:i_size))
+	!   write (*,*) r_errmx
 	  r_crscrit= r_errmx* p_param%phy%r_crstolerance
 	  r_refcrit= r_errmx* p_param%phy%r_reftolerance
 
@@ -726,6 +727,7 @@ CALL slm_windquit
 
 	  CALL stop_watch('start',1,p_timeaux)
 	  CALL stop_watch('start',8,p_time)
+	  
 	  time_loop: DO i_timecount= p_param%phy%i_frsttimestep, p_param%phy%i_lasttimestep
 	    p_timestepinfo%i_step  = i_timecount
 	    p_timestepinfo%r_modeltime= p_param%phy%r_deltatime* i_timecount
@@ -748,6 +750,7 @@ CALL slm_windquit
 	      i_size= p_ghand(i_timeplus)%i_nnumber
 	      allocate(r_tracer(i_size), r_coord(GRID_dimension,i_size), stat=i_alct)
 	      IF(i_alct /= 0) CALL grid_error(38)
+		
 
 !-SLM--------- do the following SLM calculations in arrays (grid-point-wise)
 
@@ -791,7 +794,7 @@ CALL slm_windquit
 	    r_modtime= p_timestepinfo%r_modeltime- p_param%phy%r_deltatime
 	    CALL slm_astep(p_ghand, p_param, p_time, r_modtime, i_size, &
 	                   r_coord, r_tracer)
-
+		! write(*,*) r_tracer
 !-SLM--------- update grid data structure and deallocate work arrays
 !-SLM--------- change back from (grid-point)arrays to grid data structure
 

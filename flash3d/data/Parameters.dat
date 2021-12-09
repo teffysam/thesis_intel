@@ -12,7 +12,7 @@ FINE_GRID_LEVEL
 17
 # minimum level of refinements                    [integer]
 COARSE_GRID_LEVEL
-5
+8
 # tolerance for refinement                        [real]
 TOLERANCE_OF_REFINEMENT
 0.001
@@ -33,7 +33,7 @@ BEGINNING_TIMESTEP
 1
 # last timestep                                   [integer]
 FINISHING_TIMESTEP
-4
+20
 # plot in matlab style to file (no plot = 0)      [integer]
 MATLAB_PLOTTING
 0

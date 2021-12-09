@@ -10,6 +10,7 @@
 
 # MACHINE
 MACHINE = linux_g64
+SCRATCH = /scratch/cen/numgeo/teffy/
 
 # SET MAKETHING CORRESPONDING TO MACHINE:
 MAKETHING= FLASH3D
@@ -19,19 +20,19 @@ MODE := debug
 
 # SET MAIN DIRECTORY PATH
 # !! This has to be alterd by user !!
-ROOTDIR = $(HOME)/thesis_intel
+ROOTDIR = $(SCRATCH)/thesis_intel
 
 # SET atlas/blas DIRECTORY PATH
 # !! This has to be alterd by user !!
 #BLASDIR =  /home/teffy/lapack/lapack-3.9.0/build/lib
-BLASDIR = /home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/include
+BLASDIR = /sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64
 BLASLIB = 
 
 # SET LAPACK DIRECTORY PATH
 # !! This has to be alterd by user !!
 #LAPACKDIR = /home/teffy/lapack/lapack-3.9.0/build/lib
 #LAPACKDIR = /home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/lib
-LAPACKDIR = /opt/intel/mkl/include/
+LAPACKDIR = /sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64
 LAPACKLIB = -mkl -lpthread -lc 
 
 # SET VISNET DIRECTORY PATH
@@ -49,8 +50,8 @@ CCLIBDIR = /usr/lib#/gcc/x86_64-pc-linux-gnu/4.8.5/
 CCLIB = -pthread -lstdc++
 
 # SET MORE DIRECTORY PATHS
-LIBDIR  = $(HOME)/thesis_intel/amatos3d/lib/$(MACHINE)
-INCDIR  = $(HOME)/thesis_intel/amatos3d/include/$(MACHINE)
+LIBDIR  = $(SCRATCH)/thesis_intel/amatos3d/lib/$(MACHINE)
+INCDIR  = $(SCRATCH)/thesis_intel/amatos3d/include/$(MACHINE)
 MODDIR  = $(INCDIR)
 MAINDIR = $(ROOTDIR)/flash3d
 
@@ -64,11 +65,11 @@ BUILDIR = $(MAINDIR)/$(MACHINE)
 # SET LIBRARY PATHS
 # LIBNETCDF = 
 #LIBNETCDF = -L/usr/local/lib -lnetcdff #-L/sw/wheezy-x64/netcdf-4.3.2-gccsys/lib -lnetcdf
-LIBNETCDF = -L/home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/netcdf-fortran-4.5.2-3mzij622xh7vjfixz7qo4xmy4vnz3la3/lib -lnetcdff
+LIBNETCDF = -L/sw/jessie-x64/netcdf_fortran-4.5.1-gccsys/lib -lnetcdff
 
 # SET INCLUDE PATHS
 # INCNETCDF =
-INCNETCDF = -I/home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/netcdf-fortran-4.5.2-3mzij622xh7vjfixz7qo4xmy4vnz3la3/include
+INCNETCDF = -I/sw/jessie-x64/netcdf_fortran-4.5.1-gccsys/include
 AMATOS    = $(INCDIR)/grid_api.mod
 
 # SET THE ENDING OF MODULE FILES
@@ -84,26 +85,26 @@ CC 	= icc
 LOADER  = ifort
 # --------------------- next are for debugging ------------------#
 ifeq ($(strip $(MODE)),debug)
-  FFLAGS  = -O0 -CB -ggdb#-fbounds-check-fpic -funderscoring # -C
-  CFLAGS  = -ggdb -fpic
-  LDFLAGS = -ggdb
+  FFLAGS  = -O0 -CB -g#-fbounds-check-fpic # -C
+  CFLAGS  = -g -fpic
+  LDFLAGS = -g
 endif
 # --------------------- next are for optimized debugging --------#
 ifeq ($(strip $(MODE)),optdebug)
-  FFLAGS  = -fast #-fPIC -funderscoring # -C
-  CFLAGS  = -g -fpic
+  FFLAGS  = -fast #-fPIC # -C -checkall -w
+  CFLAGS  = -g -fpic 
   LDFLAGS = -g
   SHFLAGS = -fPIC -shared
 endif
 # --------------------- next are for normal compilation ---------#
 ifeq ($(strip $(MODE)),norm)
-  FFLAGS  = -fPIC -funderscoring
+  FFLAGS  = -fPIC -fast -checkall -w
   CFLAGS  = -fpic
   LDFLAGS =
 endif
 # --------------------- next are for optimization ---------------#
 ifeq ($(strip $(MODE)),opt)
-  FFLAGS  = -O3 -fPIC -funderscoring
+  FFLAGS  = -O3 -fast
   CFLAGS  = -O3 -fpic
   LDFLAGS = -O3
 endif
@@ -229,10 +230,17 @@ Agulhas::
 	@make maincopy
 	@cp $(OPTDIR)/ADV_wind.agulhas.tstep.f90 ADV_wind.f90
 	@cp $(OPTDIR)/ADV_rhs.agulhas.f90 ADV_rhs.f90
+#	@cp $(OPTDIR)/test_box_rhs.agulhas.f90 ADV_rhs.f90
 	@make datacopy
-	# @ln -s /pool/c_grid_agulhas.nc ../../../Windparam.dat
-	# @cp $(DATDIR)/BACKUP_smaller_agulhas_Triang.dat ../../../Triang.dat
 	@cp $(DATDIR)/Triang_agulhas_test_cuboid.dat ../../../Triang.dat
+#	@cp $(DATDIR)/Triang_agulhas_test_cuboid_tiny.dat ../../../Triang.dat
+
+Agulhas_Retroflection::
+	@make maincopy
+	@cp $(OPTDIR)/ADV_wind.agulhas.tstep.f90 ADV_wind.f90
+	@cp $(OPTDIR)/ADV_rhs.agulhas.f90 ADV_rhs.f90
+	@make datacopy
+	@cp $(DATDIR)/Triang_agulhas_full_domain.dat ../../../Triang.dat
 
 Quadrature::
 	@cp $(OPTDIR)/ADV_semilagrange.adv ADV_semilagrange.f90

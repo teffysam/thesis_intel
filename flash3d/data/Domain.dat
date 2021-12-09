@@ -35,16 +35,16 @@ NUMBER_OF_VERTICES
 #   NUMBER_OF_DIMENSIONS * NUMBER_OF_VERTICES + 1 lines:
 # 1. keyword line, after that data lines (only one collumn)
 VERTEX_DATA
-15.0
+0.0
 -44.0
 0.001
-36.0
+45.0
 -44.0
 0.001
-36.0
+45.0
 -25.0
 0.001
-15.0
+0.0
 -25.0
 0.001
 !-------------------------------------------------------------------

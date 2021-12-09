@@ -79,10 +79,13 @@
 	  INTEGER                            :: i_cnt, i_cntp1
 
 !---------- calculate differences
-
+!!! r_d computes differences in the nodes
+	  ! can use absolute values or average values
 	  DO i_cnt=1,GRID_tetranodes
 	    i_cntp1   = mod(i_cnt,GRID_tetranodes)+ 1
-	    r_d(i_cnt)=  abs(r_v(i_cnt)- r_v(i_cntp1))
+	    ! r_d(i_cnt)=  abs(r_v(i_cnt)- r_v(i_cntp1))
+	    r_d(i_cnt)=  (r_v(i_cnt)+ r_v(i_cntp1))/2
+	!   r_d(i_cnt)= 1e4
 	  END DO
 
 !---------- this is the estimated error
@@ -120,7 +123,7 @@
 
 	  CALL grid_getinfo(p_ghand, i_size, l_finelevel= .TRUE., i_valpoint= GRID_tracer, &
 	                    r_tetravalues= r_aux)
-
+! write(*,*) r_aux
 !---------- loop through all elements of finest loop
 
 	  elmt_loop: DO i_cnt=1,i_siz

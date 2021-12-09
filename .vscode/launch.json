@@ -14,7 +14,7 @@
             "logging": {
                 "engineLogging": true
                        },
-            "args": ["-b","-f","${workspaceFolder}/Parameters.dat"],
+            "args": ["-b","-f","./Parameters.dat"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             // "environment": [

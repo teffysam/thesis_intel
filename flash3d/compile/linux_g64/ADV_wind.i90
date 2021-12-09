@@ -1,4 +1,4 @@
-# 1 "/home/teffy/thesis_intel/flash3d/compile/linux_g64/ADV_wind.f90"
+# 1 "/scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/ADV_wind.f90"
 !*****************************************************************
 !
 ! MODULE NAME:
@@ -256,14 +256,14 @@
 
 	  ALLOCATE( r_flowx(i_lon, i_lat, i_z, i_timesteps), r_flowy(i_lon, i_lat, i_z, i_timesteps),&
 	    & r_flowz(i_lon, i_lat, i_z, i_timesteps), stat= i_alct, errmsg=my_errmsg)
-	write(*,*) i_alct, my_errmsg
+! write(*,*) i_alct, my_errmsg
      IF(i_alct /= 0) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not allocate currents fields')
 		
 
 
 !READ TIME
-	  c_filename='/pool/testu_rdr'
+	  c_filename='/scratch/cen/numgeo/teffy/model_data_agulhas_region/agulhas_uvel.cdf'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -276,7 +276,7 @@
 	  IF(r_tim .ne. 0) THEN 
 		r_ttim=r_tim/86400
 	  END IF
-	  write(*,*) r_tim,r_ttim
+!   write(*,*) r_tim,r_ttim
 startA(1)=r_ttim+1
 countA(1)=i_timesteps
 !write(*,*) startA, countA
@@ -298,13 +298,12 @@ countB(2)=i_lat
 countB(3)=i_z
 countB(4)=i_timesteps
 
-!OPEN UVEL
+!	OPEN UVEL
       i_ncstat= nf_inq_varid(i_fileid, 'UVEL', i_varid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine varid of var131')
 	 
 		i_ncstat= nf_get_vara_real(i_fileid, i_varid, startB, countB, r_flowx)
-write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not read var131 data')
 		
@@ -315,7 +314,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 
 !   OPEN VVEL
-		c_filename='/pool/testv_rdr'
+		c_filename='/scratch/cen/numgeo/teffy/model_data_agulhas_region/agulhas_vvel.cdf'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 		CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -335,7 +334,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 
 
 !   OPEN WVEL
-		c_filename='/pool/testw_rdr'
+		c_filename='/scratch/cen/numgeo/teffy/model_data_agulhas_region/agulhas_wvel.cdf'
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not open currents data file')
@@ -350,7 +349,9 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 		i_ncstat= nf_close(i_fileid)
 	IF(i_ncstat /= NF_NOERR) &
 	  CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
-
+	  r_flowx=1
+	  r_flowy=0
+	  r_flowz=0
 
 
 !---------- Fix mask values
@@ -368,7 +369,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 !-----------set timeinterval length between winddata (Timeformat here: yymmdd,ddd)
 
 !r_intervallen= (r_time(2) - r_time(1))*24*60*60
-	  r_intervallen= 86400 !r_time(2) - r_time(1)
+	  r_intervallen= 86400 !r_time(2) - r_time(1) ! already in seconds, timestep is 86400 anyway
 
 !---------- close currents file
 
@@ -483,7 +484,7 @@ write(*,*) startB, countB, i_ncstat, r_flowx(9,9,3,1)
 	  
 	  
 
-	  c_filename= '/pool/agulhas_grid_rdr.cdf'
+	  c_filename= '/scratch/cen/numgeo/teffy/model_data_agulhas_region/agulhas_grid_rdr.cdf'
 !---------- open current file
 
       i_ncstat= nf_open(c_filename,NF_NOWRITE,i_fileid)
@@ -577,7 +578,7 @@ i_timesteps=1
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine height varid')
 	  i_ncstat= nf_get_var_real(i_fileid, i_varid, r_z)
 	  r_z=r_z/1000
-	  write(*,*) r_z
+!   write(*,*) r_z
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read height data')
 
@@ -648,7 +649,7 @@ i_timesteps=1
 	    r_yu1, r_yu2, r_yv1, r_yv2, r_yw1, r_yw2
 	  REAL                            :: r_scalx, r_scaly, r_scalz
 	  REAL                            :: r_deg
-	  REAL, PARAMETER                 :: r_earth=40075000. ! earth circumference
+	  REAL, PARAMETER                 :: r_earth=40075000. ! earth circumference in metres
 	  REAL, PARAMETER                 :: PI=3.1415927
  	
 !---------- initialize radians
@@ -760,14 +761,14 @@ i_timesteps=1
 
 	  determine_heightw: DO i_cnt=1, i_z-1
 	    IF(r_zw(i_cnt) >= r_coord(3) .AND. r_zw(i_cnt +1) <= r_coord(3)) THEN
-	        i_lozz= i_cnt
-	        i_hizz= i_cnt+1
+	        i_lozz= i_cnt+1
+	        i_hizz= i_cnt
 	        exit determine_heightw
 	    END IF
 	  END DO determine_heightw
 	  IF(r_zw(i_z) >= r_coord(3)) THEN
-	    i_lozz = i_z
-	    i_hizz = i_z-1
+	    i_lozz = i_z-1
+	    i_hizz = i_z
 	  END IF
 !TODO fix this problem tommorow:fixed
 !---------- calculate weights for bilinear interpolation
@@ -782,15 +783,16 @@ i_timesteps=1
 
 	  r_dz=  r_z(i_hiz) -  r_z(i_loz) 
 	  r_dwz=  r_zw(i_hizz) - r_zw(i_lozz) 
-
+!   write (*,*) r_z ,r_zw
 	  r_lux= r_coord(1) - r_lonu(i_loux)
 	  r_lvx= r_coord(1) - r_lonv(i_lovx)
 	  r_lwx= r_coord(1) - r_lonw(i_lowx)
 	  r_luy= r_coord(2) - r_latu(i_louy)
 	  r_lvy= r_coord(2) - r_latv(i_lovy)
 	  r_lwy= r_coord(2) - r_latw(i_lowy)
-	  r_lz= r_z(i_loz) - r_coord(3) 
-	  r_lzz=  r_zw(i_lozz) - r_coord(3) 
+!!!! These two lines below fixes vertical ocean !!!!!!
+	  r_lz= abs(r_z(i_loz) - r_coord(3)) 
+	  r_lzz=  abs(r_zw(i_lozz) - r_coord(3)) 
 
 	  r_hux= r_lonu(i_hiux) - r_coord(1)
 	  r_hvx= r_lonv(i_hivx) - r_coord(1)
@@ -798,14 +800,14 @@ i_timesteps=1
 	  r_huy= r_latu(i_hiuy) - r_coord(2)
 	  r_hvy= r_latv(i_hivy) - r_coord(2)
 	  r_hwy= r_latw(i_hiwy) - r_coord(2)
-	  r_hz=   r_coord(3) -r_z(i_hiz) 
-	  r_hzz=   r_coord(3) - r_zw(i_hizz) 
+	  r_hz=   abs(r_coord(3) -r_z(i_hiz)) 
+	  r_hzz=   abs(r_coord(3) - r_zw(i_hizz)) 
 !   write (*,*) r_hz, r_hzz
 
 	  r_scalx= r_deg * 1./cos(r_coord(2)*PI/180.)  ! in degree/sec
 	  r_scaly= r_deg
 	  r_scalz= 1.  / 1000.                         ! km to m
-
+!   write(*,*) r_scalx, r_scaly, r_scalz
 !---------- linear interpolation in x-direction
 ! Interpolation in a Arakawa Staggered C grid
 !
@@ -912,7 +914,7 @@ i_timesteps=1
 	  ELSE
 	    r_inter(3)= r_yw1 * r_scalz
 	  END IF
-	  
+	  write (*,*) r_inter
 
 	  RETURN
 	  END FUNCTION data_interpol

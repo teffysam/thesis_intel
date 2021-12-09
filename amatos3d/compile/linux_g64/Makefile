@@ -13,6 +13,7 @@ MACHINE = linux_g64
 
 # SYSTEM
 SYSTEM = std-f90
+SCRATCH = /scratch/cen/numgeo/teffy/
 
 # SET MAKETHING CORRESPONDING TO MACHINE:
 MAKETHING= AMATOS3D
@@ -38,18 +39,18 @@ MACROS =
 
 # SET MAIN DIRECTORY PATH
 # !! This has to be alterd by user !!
-ROOTDIR = $(HOME)/thesis_intel
+ROOTDIR = $(SCRATCH)/thesis_intel
 
 # SET atlas/blas DIRECTORY PATH
 # !! This has to be alterd by user !!
-BLASDIR = /home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/lib
+BLASDIR = /sw/jessie-x64/intel/intel-19.0.4/mkl/include/
 BLASLIB = -lblas #comment for intel
 
 # SET LAPACK DIRECTORY PATH
 # !! This has to be alterd by user !!
 # LAPACKDIR =
 #LAPACKDIR = /home/teffy/lapack/lapack-3.9.0/build/lib
-LAPACKDIR =  /opt/intel/mkl/include/#/home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/include #/opt/intel/mkl/include
+LAPACKDIR =  /sw/jessie-x64/intel/intel-19.0.4/mkl/include/#/home/teffy/spack/opt/spack/linux-arch-skylake/intel-19.1.1.217/openblas-0.3.10-hfycupkeohg5d5rbocnv35hoh6li25yh/include #/opt/intel/mkl/include
 LAPACKLIB =  -mkl #-lpthread -lc #-mkl
 
 # SET IO_EMIT LIBRARY PATH
@@ -97,28 +98,28 @@ MF = -D
 
 # --------------------- next are for debugging ------------------#
 ifeq ($(strip $(MODE)),debug)
-  FFLAGS  = -fbounds-check -ggdb -fpic -funderscoring # -C
-  CFLAGS  = -ggdb -fpic
-  LDFLAGS = -ggdb
+  FFLAGS  = -g -fpic  # -C
+  CFLAGS  = -g -fpic
+  LDFLAGS = -g
   SHFLAGS = -fpic -shared
 endif
 # --------------------- next are for optimized debugging --------#
 ifeq ($(strip $(MODE)),optdebug)
-  FFLAGS  = -fPIC -funderscoring # -C
+  FFLAGS  = -fPIC  # -C
   CFLAGS  = -g -fpic
   LDFLAGS = -g
   SHFLAGS = -fPIC -shared
 endif
 # --------------------- next are for normal compilation ---------#
 ifeq ($(strip $(MODE)),norm)
-  FFLAGS  = -fPIC -funderscoring
+  FFLAGS  = -fPIC 
   CFLAGS  = -fpic
   LDFLAGS =
   SHFLAGS = -fPIC -shared
 endif
 # --------------------- next are for optimization ---------------#
 ifeq ($(strip $(MODE)),opt)
-  FFLAGS  = -O3 -fPIC -funderscoring
+  FFLAGS  = -O3 -fPIC 
   CFLAGS  = -O3 -fpic
   LDFLAGS = -O3
   SHFLAGS = -fPIC -shared

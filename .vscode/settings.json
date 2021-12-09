@@ -1,10 +1,16 @@
 {
     "git.ignoreLimitWarning": true,
-    "editor.fontFamily": " 'cascadia code'",
+    "editor.fontFamily": "'noto sans mono medium'",
     "C_Cpp.default.customConfigurationVariables": {},
-    "debug.console.fontFamily": "'Hack'",
-    "terminal.integrated.fontFamily": "'cascadia code'",
-    "editor.fontSize": 13,
-    "customizeUI.font.monospace": "cascadia code",
-    "customizeUI.font.regular": "inter"
+    "debug.console.fontFamily": "'droid sans mono slashed'",
+    "terminal.integrated.fontFamily": "droid sans mono slashed",
+    "customizeUI.font.droid sans mono slashed": "droid sans mono slashed",
+    "customizeUI.font.regular": "Lucida Grande",
+    "editor.fontSize": 12,
+    "scm.inputFontSize": 12,
+    "debug.console.fontSize": 12,
+    "markdown.preview.fontSize": 12,
+    "editor.codeLensFontFamily": "'droid sans mono slashed'",
+    "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+    "scm.inputFontFamily": "Cantarell"
 }
