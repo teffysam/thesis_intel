@@ -349,9 +349,9 @@ countB(4)=i_timesteps
 		i_ncstat= nf_close(i_fileid)
 	IF(i_ncstat /= NF_NOERR) &
 	  CALL grid_error(c_error='[read_netcdf_currents]: could not close currents data file')
-	  r_flowx=1
-	  r_flowy=0
-	  r_flowz=0
+!   r_flowx=1
+!   r_flowy=1
+!   r_flowz=0
 
 
 !---------- Fix mask values
@@ -761,14 +761,14 @@ i_timesteps=1
 
 	  determine_heightw: DO i_cnt=1, i_z-1
 	    IF(r_zw(i_cnt) >= r_coord(3) .AND. r_zw(i_cnt +1) <= r_coord(3)) THEN
-	        i_lozz= i_cnt+1
-	        i_hizz= i_cnt
+	        i_lozz= i_cnt
+	        i_hizz= i_cnt+1
 	        exit determine_heightw
 	    END IF
 	  END DO determine_heightw
 	  IF(r_zw(i_z) >= r_coord(3)) THEN
-	    i_lozz = i_z-1
-	    i_hizz = i_z
+	    i_lozz = i_z
+	    i_hizz = i_z-1
 	  END IF
 !TODO fix this problem tommorow:fixed
 !---------- calculate weights for bilinear interpolation
@@ -781,8 +781,8 @@ i_timesteps=1
 	  r_dvy= r_latv(i_hivy)- r_latv(i_lovy)
 	  r_dwy= r_latw(i_hiwy)- r_latw(i_lowy)
 
-	  r_dz=  r_z(i_hiz) -  r_z(i_loz) 
-	  r_dwz=  r_zw(i_hizz) - r_zw(i_lozz) 
+	  r_dz=  abs(r_z(i_hiz) -  r_z(i_loz)) 
+	  r_dwz=  abs(r_zw(i_hizz) - r_zw(i_lozz)) 
 !   write (*,*) r_z ,r_zw
 	  r_lux= r_coord(1) - r_lonu(i_loux)
 	  r_lvx= r_coord(1) - r_lonv(i_lovx)
@@ -914,7 +914,7 @@ i_timesteps=1
 	  ELSE
 	    r_inter(3)= r_yw1 * r_scalz
 	  END IF
-	  write (*,*) r_inter
+!   write (*,*) r_inter
 
 	  RETURN
 	  END FUNCTION data_interpol

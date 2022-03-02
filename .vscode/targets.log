@@ -1,4 +1,4 @@
-make all -f "/scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/" --print-data-base --no-builtin-variables --no-builtin-rules --question
+make all -f /scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/ --print-data-base --no-builtin-variables --no-builtin-rules --question
 make: *** /scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/: Is a directory.  Stop.
  
 # GNU Make 4.0
@@ -8,7 +8,7 @@ make: *** /scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/: Is 
 # This is free software: you are free to change and redistribute it.
 # There is NO WARRANTY, to the extent permitted by law.
 
-# Make data base, printed on Tue Nov 16 12:43:04 2021
+# Make data base, printed on Sun Feb 27 14:44:15 2022
 
 # Variables
 
@@ -39,25 +39,25 @@ SHELL = /bin/sh
 # environment
 VSCODE_NLS_CONFIG = {"locale":"en","availableLanguages":{}}
 # environment
-_ = /home/zmaw/u301161/.vscode-server/bin/f4af3cbf5a99787542e2a30fe1fd37cd644cc31f/server.sh
+_ = /home/zmaw/u301161/.vscode-server/bin/f80445acd5a3dadef24aa209168452a3d97cc326/node
 # makefile (from '/scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/', line 1)
 MAKEFILE_LIST :=  /scratch/cen/numgeo/teffy/thesis_intel/flash3d/compile/linux_g64/
 # environment
 GNUMAKEFLAGS := 
 # environment
-LOADEDMODULES_modshare = netcdf/c-4.7.3-fortran-4.5.2-cxx4-4.3.1-cxx-4.2:1:intel/19.0.4:1:vscode/1.56.2:1:default:1:jdk/1.8.0_92:1
+LOADEDMODULES_modshare = netcdf/c-4.7.3-fortran-4.5.2-cxx4-4.3.1-cxx-4.2:2:intel/19.0.4:2:vscode/1.56.2:2:default:3:jdk/1.8.0_92:2
 # environment
 VSCODE_VERBOSE_LOGGING = true
 # environment
 VSCODE_CWD = /home/zmaw/u301161
 # environment
-_LMFILES__modshare = /client/Modules/jdk/1.8.0_92:2:/client/Modules/netcdf/c-4.7.3-fortran-4.5.2-cxx4-4.3.1-cxx-4.2:1:/client/Modules/vscode/1.56.2:1:/client/Modules/default:1
+_LMFILES__modshare = /client/Modules/jdk/1.8.0_92:4:/client/Modules/netcdf/c-4.7.3-fortran-4.5.2-cxx4-4.3.1-cxx-4.2:2:/client/Modules/vscode/1.56.2:2:/client/Modules/default:3
 # environment
 NSS_SDB_USE_CACHE = yes
 # environment
-SSH_CONNECTION = 134.100.240.1 50204 134.100.240.55 22
+SSH_CONNECTION = 134.100.240.1 37166 134.100.240.55 22
 # environment
-PATH = /home/zmaw/u301161/.vscode-server/bin/f4af3cbf5a99787542e2a30fe1fd37cd644cc31f/bin:/home/zmaw/u301161/.vscode-server/bin/f4af3cbf5a99787542e2a30fe1fd37cd644cc31f/bin:/sw/jessie-x64/io_aec/netcdf-c-4.7.3-fortran-4.5.2-cxx4-4.3.1-cxx-4.2-gccsys/bin:/sw/jessie-x64/intel/intel-19.0.4/bin:/sw/jessie-x64/devtools/jdk-1.8.0_92/bin:/sw/jessie-x64/vscode-1.56.2/share/code/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/client/bin:/home/zmaw/u301161/bin
+PATH = /home/zmaw/u301161/.vscode-server/bin/f80445acd5a3dadef24aa209168452a3d97cc326/bin/remote-cli:/sw/jessie-x64/io_aec/netcdf-c-4.7.3-fortran-4.5.2-cxx4-4.3.1-cxx-4.2-gccsys/bin:/sw/jessie-x64/intel/intel-19.0.4/bin:/sw/jessie-x64/devtools/jdk-1.8.0_92/bin:/sw/jessie-x64/vscode-1.56.2/share/code/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/client/bin
 # environment
 LM_LICENSE_FILE = 1704@matlab.rrz.uni-hamburg.de:1700@lizenzsrv8.rrz.uni-hamburg.de:1955@license.cen.uni-hamburg.de
 # environment
@@ -74,6 +74,8 @@ FPATH = /sw/jessie-x64/intel/intel-19.0.4/mkl/include
 VSCODE_LOG_STACK = false
 # default
 .FEATURES := target-specific order-only second-expansion else-if shortest-stem undefine oneshell archives jobserver output-sync check-symlink load
+# environment
+SSH_AUTH_SOCK = /run/user/100205/vscode-ssh-auth-sock-361192005
 # automatic
 %F = $(notdir $%)
 # environment
@@ -81,19 +83,19 @@ VSCODE_PIPE_LOGGING = true
 # environment
 PWD = /scratch/cen/numgeo/teffy/thesis_intel
 # environment
-VSCODE_IPC_HOOK_CLI = /run/user/100205/vscode-ipc-6f6a497f-1a64-4e46-a9e0-ca177885cf02.sock
+VSCODE_IPC_HOOK_CLI = /run/user/100205/vscode-ipc-cddbe688-a6e2-45fe-9323-b110a9b3586c.sock
 # automatic
 *D = $(patsubst %/,%,$(dir $*))
 # environment
 MANPATH = /sw/jessie-x64/intel/intel-19.0.4/man/common:/sw/jessie-x64/devtools/jdk-1.8.0_92/man:/usr/man:/usr/share/man:/client/man
 # environment
-VSCODE_AMD_ENTRYPOINT = vs/server/remoteExtensionHostProcess
+VSCODE_AMD_ENTRYPOINT = vs/workbench/services/extensions/node/extensionHostProcess
 # environment
 HOME = /home/zmaw/u301161
 # environment
 LD_LIBRARY_PATH = /scratch/cen/numgeo/teffy/thesis_intel/amatos3d/lib/linux_g64:/sw/jessie-x64/netcdf_fortran-4.5.1-gccsys/lib:/sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64:$LD_LIBRARY_PATH
 # environment
-MODULEPATH_modshare = /client/Modules:1
+MODULEPATH_modshare = /client/Modules:3
 # environment
 MODULESHOME = /sw/share/Modules
 # environment
@@ -113,11 +115,11 @@ MAKE = $(MAKE_COMMAND)
 # default
 MAKECMDGOALS := all
 # environment
-SHLVL = 2
+SHLVL = 3
 # environment
 JAVA_HOME = /sw/jessie-x64/devtools/jdk-1.8.0_92
 # environment
-XDG_SESSION_ID = 164921
+XDG_SESSION_ID = 303423
 # environment
 USER = u301161
 # makefile
@@ -129,7 +131,7 @@ ICCCFG = /sw/jessie-x64/intel/intel-19.0.4/bin/rpath.cfg
 # default
 MAKE_COMMAND := make
 # environment
-PROFILEREAD =  /client/etc/profile.zmaw
+PROFILEREAD =  /client/etc/profile.zmaw /client/etc/profile.zmaw /client/etc/profile.zmaw
 # environment
 PATH_modshare = /sw/jessie-x64/vscode-1.56.2/share/code/bin:1:/bin:1:/sw/jessie-x64/devtools/jdk-1.8.0_92/bin:1:/usr/bin:1:/usr/games:1:/client/bin:1:/sw/jessie-x64/io_aec/netcdf-c-4.7.3-fortran-4.5.2-cxx4-4.3.1-cxx-4.2-gccsys/bin:1:/sw/jessie-x64/intel/intel-19.0.4/bin:1:/usr/local/bin:1:/usr/local/games:1
 # default
@@ -146,23 +148,23 @@ MAKEFLAGS = pqrR
 # environment
 MFLAGS = -pqrR
 # environment
-SSH_CLIENT = 134.100.240.1 50204 22
+SSH_CLIENT = 134.100.240.1 37166 22
 # environment
 MAIL = /var/mail/u301161
 # environment
 LOADEDMODULES = default:vscode/1.56.2:jdk/1.8.0_92:intel/19.0.4:netcdf/c-4.7.3-fortran-4.5.2-cxx4-4.3.1-cxx-4.2
 # environment
-LIBRARY_PATH_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64:1
+LIBRARY_PATH_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64:2
 # automatic
 +D = $(patsubst %/,%,$(dir $+))
 # environment
 APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = true
 # environment
-CPATH_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/include:1
+CPATH_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/include:2
 # environment
-FPATH_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/include:1
+FPATH_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/include:2
 # environment
-BROWSER = /home/zmaw/u301161/.vscode-server/bin/f4af3cbf5a99787542e2a30fe1fd37cd644cc31f/bin/helpers/browser.sh
+BROWSER = /home/zmaw/u301161/.vscode-server/bin/f80445acd5a3dadef24aa209168452a3d97cc326/bin/helpers/browser.sh
 # environment
 ICPCCFG = /sw/jessie-x64/intel/intel-19.0.4/bin/rpath.cfg
 # default
@@ -182,17 +184,15 @@ LC_ALL = C
 # default
 SUFFIXES := 
 # environment
-MANPATH_modshare = /sw/jessie-x64/devtools/jdk-1.8.0_92/man:1:/usr/man:1:/client/man:1:/sw/jessie-x64/intel/intel-19.0.4/man/common:1:/usr/share/man:1
+MANPATH_modshare = /sw/jessie-x64/devtools/jdk-1.8.0_92/man:2:/usr/man:1:/client/man:1:/sw/jessie-x64/intel/intel-19.0.4/man/common:2:/usr/share/man:1
 # environment
-LD_LIBRARY_PATH_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64:1:/sw/jessie-x64/intel/intel-19.0.4/lib/intel64:1
+LD_LIBRARY_PATH_modshare = /sw/jessie-x64/intel/intel-19.0.4/lib/intel64:/scratch/cen/numgeo/teffy/thesis_intel/amatos3d/lib/linux_g64:/sw/jessie-x64/netcdf_fortran-4.5.1-gccsys/lib:/sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64:/scratch/cen/numgeo/teffy/thesis_intel/amatos3d/lib/linux_g64:/sw/jessie-x64/netcdf_fortran-4.5.1-gccsys/lib:/sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64:$LD_LIBRARY_PATH:999999999:/sw/jessie-x64/intel/intel-19.0.4/mkl/lib/intel64:2:/scratch/cen/numgeo/teffy/thesis_intel/amatos3d/lib/linux_g64:999999999:/sw/jessie-x64/intel/intel-19.0.4/lib/intel64:1:/sw/jessie-x64/netcdf_fortran-4.5.1-gccsys/lib:999999999
 # default
 .INCLUDE_DIRS = /usr/include /usr/local/include /usr/include
-# environment
-VSCODE_INJECT_NODE_MODULE_LOOKUP_PATH = /home/zmaw/u301161/.vscode-server/bin/f4af3cbf5a99787542e2a30fe1fd37cd644cc31f/remote/node_modules
 # default
 .RECIPEPREFIX := 
 # environment
-INCLUDE_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/include:1
+INCLUDE_modshare = /sw/jessie-x64/intel/intel-19.0.4/mkl/include:2
 # default
 MAKE_HOST := x86_64-pc-linux-gnu
 # environment
@@ -250,6 +250,6 @@ all:
 # strcache performance: lookups = 9 / hit rate = 33%
 # hash-table stats:
 # Load=6/8192=0%, Rehash=0, Collisions=0/9=0%
-# Finished Make data base on Tue Nov 16 12:43:04 2021
+# Finished Make data base on Sun Feb 27 14:44:15 2022
 
  

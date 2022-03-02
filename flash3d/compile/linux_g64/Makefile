@@ -229,10 +229,13 @@ Small_Pinatubo::
 Agulhas::
 	@make maincopy
 	@cp $(OPTDIR)/ADV_wind.agulhas.tstep.f90 ADV_wind.f90
-	@cp $(OPTDIR)/ADV_rhs.agulhas.f90 ADV_rhs.f90
-#	@cp $(OPTDIR)/test_box_rhs.agulhas.f90 ADV_rhs.f90
+#	@cp $(OPTDIR)/ADV_rhs.agulhas.f90 ADV_rhs.f90
+#	@cp $(OPTDIR)/SLM_simple.clip SLM_simple.f90
+#	@cp $(OPTDIR)/SLM_advanced.dual SLM_advanced.f90
+	@cp $(OPTDIR)/test_box_rhs.agulhas.f90 ADV_rhs.f90
 	@make datacopy
-	@cp $(DATDIR)/Triang_agulhas_test_cuboid.dat ../../../Triang.dat
+#	@cp $(DATDIR)/Triang_agulhas_test_cuboid.dat ../../../Triang.dat
+	@cp $(DATDIR)/Triang_pinatubo_1cube_mozam.dat ../../../Triang.dat
 #	@cp $(DATDIR)/Triang_agulhas_test_cuboid_tiny.dat ../../../Triang.dat
 
 Agulhas_Retroflection::

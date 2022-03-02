@@ -247,7 +247,7 @@
 	  SUBROUTINE slm_update(p_param, i_arlen, r_coord, r_rside, r_udate, r_time)
 
 !---------- local declarations
-
+		
 	  IMPLICIT NONE
 
 	  TYPE (control_struct), INTENT(in)                   :: p_param
@@ -257,7 +257,7 @@
 	  REAL, DIMENSION(i_arlen), INTENT(out)               :: r_udate
 	  REAL, INTENT(in), OPTIONAL                          :: r_time
 	  INTEGER                                             :: i_cnt
-	  REAL                                                :: r_dt, r_tim
+	  REAL                                                :: r_dt, r_tim,  r_righthandside, r_integral
 
 !---------- in the linear advection case and with f90 this is just
 
@@ -273,8 +273,11 @@
 	  END IF
 
 	  main_loop: DO i_cnt=1, i_arlen
-	    ! r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
-		r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(p_param,r_coord(:,i_cnt),r_tim),r_coord(:,i_cnt),i_cnt,r_time)
+	  r_righthandside = slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
+	  r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* r_righthandside
+	  r_integral = grid_integral(p_param, r_righthandside)
+
+		! r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(p_param,r_coord(:,i_cnt),r_tim),r_coord(:,i_cnt),i_cnt,r_time)
 	  END DO main_loop
 	  RETURN
 	  END SUBROUTINE slm_update

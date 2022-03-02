@@ -1177,8 +1177,7 @@
 	END SUBROUTINE grid_timetoggle
 
 !*****************************************************************
-	FUNCTION grid_integral(p_mesh, i_valpoint, r_watermark, l_lowbound) &
-	RESULT (r_value)
+	FUNCTION grid_integral(p_mesh, i_valpoint, r_watermark, l_lowbound) RESULT (r_value)
 
 !---------- local declarations
 

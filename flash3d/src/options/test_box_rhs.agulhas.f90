@@ -64,7 +64,7 @@
 	  PUBLIC :: slm_righthand
 	  CONTAINS
 !*****************************************************************
-	  FUNCTION slm_righthand(p_param,r_coord, r_time) RESULT (r_rhs)
+	  FUNCTION slm_righthand(p_param, r_coord, r_time) RESULT (r_rhs)
 
 !---------- local declarations
 
@@ -98,10 +98,13 @@
 
 	!   r_high = r_top - r_centr(3)                   ! ash cloud thickness
 ! Big cuboid domain is 44S to 25S and 0E to 45E with three tracer sections
+	  ! 30S 40E inside agulhas axis
+	  ! 18S 41E mozambique channel
+	  ! 35S 20E outside agulhas axis near SA
 !----------- initialise coordinated for ball injection (sphere)
-	  r_centr(1) =	20.5999                   ! x-Position [degree]
-	  r_centr(2) = -37.9999				 ! y-Position [degree]
-	  r_centr(3) =	3.001  						! km
+	  r_centr(1) =	41.0                   ! x-Position [degree]
+	  r_centr(2) = -18.0				 ! y-Position [degree]
+	  r_centr(3) =	3.0  						! km
 	!   r_centr1(1) =	30.5999                   ! x-Position [degree]
 	!   r_centr1(2) = -30.9999				 ! y-Position [degree]
 	!   r_centr1(3) =	3.001  						! km
@@ -119,10 +122,10 @@
 ! Condition is simple: calc distance between coord from centre of sphere, if within centre of sphere tracer injected, if not, oh well
 ! TODO: Analytic: calc distance from my spec ball 35S 26E, 1 degree radius; convert to km? 
 ! insert time condition too
-	  IF (r_dist .LE. 5 .AND. r_coord(3) .EQ. 3 .AND. r_time .LE. 86400 ) THEN
-	!   IF (r_coord(1) .GE. 20 .AND. r_coord(1) .LE. 24 .AND. r_coord(3) .GE. 2 .AND. r_time .LE. 86400) THEN
+	  IF (r_dist .LE. 3 .AND. r_coord(3) .EQ. 3.0 .AND. r_time .LE. 86400 ) THEN
+	!   IF (r_coord(1) .GE. 31.5 .AND. r_coord(1) .LE. 38.5 .AND. r_coord(2) .EQ. -23.75 .AND. r_time .LE. 86400) THEN
 	!   IF (r_coord(1) .EQ. 20.5 .AND. r_coord(2) .EQ. -37.5 .AND. r_coord(3) .EQ. 3 .AND. r_time .LE. 86400) THEN
-	    	r_rhs = 1e+30
+	    	r_rhs = 1e+3
 	!   ELSE IF( r_dist1 .LE. 5 .AND. r_time .LE. 86400 ) THEN
 	!     r_rhs = 1e6
 	!   ELSE IF( r_dist2 .LE. 5 .AND. r_time .LE. 86400 ) THEN
