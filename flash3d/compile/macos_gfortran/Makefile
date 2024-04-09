@@ -11,6 +11,9 @@
 # MACHINE
 MACHINE = macos_gfortran
 
+# SYSTEM
+SYSTEM = gfortran
+
 # SET MAKETHING CORRESPONDING TO MACHINE:
 MAKETHING= FLASH3D
 
@@ -23,15 +26,13 @@ ROOTDIR = $(HOME)/thesis_intel
 
 # SET atlas/blas DIRECTORY PATH
 # !! This has to be alterd by user !!
-#BLASDIR =  /home/teffy/lapack/lapack-3.9.0/build/lib
-BLASDIR = 
+BLASDIR =  
 BLASLIB = 
 
 # SET LAPACK DIRECTORY PATH
 # !! This has to be alterd by user !!
-#LAPACKDIR = /home/teffy/lapack/lapack-3.9.0/build/lib
-LAPACKDIR = /opt/homebrew/opt/lapack/lib
-LAPACKLIB = -mkl -lpthread -lc 
+LAPACKDIR = -I/opt/homebrew/opt/lapack/lib
+LAPACKLIB = -framework Accelerate
 
 # SET VISNET DIRECTORY PATH
 # !! This has to be alterd by user !!
@@ -41,15 +42,19 @@ VISNETLIB = #-lvisnet4flash -lm3tv -ldelaunay \
 	    #$(VISNETDIR)/fortify.o \
 	    #-lglut -lGLU -lGL -ltiff 
 
+# SET NETCDF PATHS
+# !! This has to be alterd by user !!
+LIBNETCDF = -L/opt/homebrew/lib -lnetcdff -lnetcdf
+INCNETCDF = -I/opt/homebrew/include
+
 # SET C++ DIRECTORY PATH
 # !! This has to be alterd by user !!
-# CCLIBDIR = /usr/lib/x86_64-linux-gnu/
-CCLIBDIR = /opt/homebrew/lib
-CCLIB = -pthread -lstdc++
+CCLIBDIR = -L/opt/homebrew/opt/gcc/lib/gcc/13
+CCLIB = -lpthread -lstdc++
 
 # SET MORE DIRECTORY PATHS
-LIBDIR  = $(HOME)/thesis_intel/amatos3d/lib/$(MACHINE)
-INCDIR  = $(HOME)/thesis_intel/amatos3d/include/$(MACHINE)
+LIBDIR  = $(ROOTDIR)/amatos3d/lib/$(MACHINE)
+INCDIR  = $(ROOTDIR)/amatos3d/include/$(MACHINE)
 MODDIR  = $(INCDIR)
 MAINDIR = $(ROOTDIR)/flash3d
 
@@ -58,17 +63,9 @@ OPTDIR  = $(MAINDIR)/src/options
 SYSDIR  = $(MAINDIR)/src/system/$(SYSTEM)
 TIMDIR  = $(MAINDIR)/src/timing
 DATDIR  = $(MAINDIR)/data
-BUILDIR = $(MAINDIR)/$(MACHINE)
+BUILDIR = $(MAINDIR)/compile/$(MACHINE)
 
-# SET LIBRARY PATHS
-# LIBNETCDF = 
-#LIBNETCDF = -L/usr/local/lib -lnetcdff #-L/sw/wheezy-x64/netcdf-4.3.2-gccsys/lib -lnetcdf
-LIBNETCDF = -L/opt/homebrew/lib -lnetcdff
-
-# SET INCLUDE PATHS
-# INCNETCDF =
-INCNETCDF = -I/opt/homebrew/include
-AMATOS    = $(INCDIR)/grid_api.mod
+AMATOS    = $(INCDIR)/GRID_API.mod
 
 # SET THE ENDING OF MODULE FILES
 MODEND  = mod
@@ -79,38 +76,38 @@ MODEND  = mod
 
 F90 	= gfortran
 cc 	= gcc-13
-CC 	= gcc-13
+CC 	= g++-13
 LOADER  = gfortran
 # --------------------- next are for debugging ------------------#
 ifeq ($(strip $(MODE)),debug)
-  FFLAGS  = -O0 -CB -g#-fbounds-check-fpic # -C
-  CFLAGS  = -g -fpic
-  LDFLAGS = -g
+  FFLAGS  = -fbounds-check -ggdb -fpic #-funderscoring # -C
+  CFLAGS  = -ggdb -fpic
+  LDFLAGS = -ggdb
 endif
 # --------------------- next are for optimized debugging --------#
 ifeq ($(strip $(MODE)),optdebug)
-  FFLAGS  = -fast #-fPIC # -C -checkall -w
-  CFLAGS  = -g -fpic 
+  FFLAGS  = -fPIC -funderscoring # -C
+  CFLAGS  = -g -fpic
   LDFLAGS = -g
   SHFLAGS = -fPIC -shared
 endif
 # --------------------- next are for normal compilation ---------#
 ifeq ($(strip $(MODE)),norm)
-  FFLAGS  = -fPIC -fast -checkall -w
+  FFLAGS  = -fPIC -funderscoring
   CFLAGS  = -fpic
   LDFLAGS =
 endif
 # --------------------- next are for optimization ---------------#
 ifeq ($(strip $(MODE)),opt)
-  FFLAGS  = -O3 -fast
+  FFLAGS  = -O3 -fPIC -funderscoring
   CFLAGS  = -O3 -fpic
   LDFLAGS = -O3
 endif
 
 # -------- next flag for using dummy graphics library -----------#
 LIBS = -L$(LIBDIR) -lamatos3d  \
-	           -L$(LAPACKDIR) $(LAPACKLIB) -L$(BLASDIR) $(BLASLIB)\
-		      $(LIBNETCDF) -L$(CCLIBDIR) $(CCLIB)\
+	          $(LAPACKDIR) $(LAPACKLIB) $(BLASDIR) $(BLASLIB)\
+		      $(LIBNETCDF) $(CCLIBDIR) $(CCLIB)\
         	    -lm
 INCS = $(INCNETCDF) -I$(INCDIR) -I$(MODDIR)
 
@@ -165,7 +162,7 @@ clearex::
 	@rm -f $(MAKETHING) Flash3D* fort.*
 
 cleardat::
-	@rm -f ../../../*.dat ../../../*.gmv ../../../*.vtu
+	@rm -f *.dat *.gmv *.vtu
 
 clean::
 	@rm -f *.o *.$(MODEND) core *.gmv *.vtu
@@ -181,9 +178,9 @@ tidy::
 #----------------------------------------------------------------#
 
 datacopy::
-	@cp $(DATDIR)/Domain.dat ../../../
-	@cp $(DATDIR)/Triang.dat ../../../
-	@cp $(DATDIR)/Parameters.dat ../../../
+	@cp $(DATDIR)/Domain.dat .
+	@cp $(DATDIR)/Triang.dat .
+	@cp $(DATDIR)/Parameters.dat .
 
 
 #----------------------------------------------------------------#
@@ -221,27 +218,8 @@ Small_Pinatubo::
 	@cp $(SRCDIR)/SLM_simple_small_pinatubo.f90 SLM_simple.f90
 	@cp $(SRCDIR)/SLM_advanced_small_pinatubo.f90 SLM_advanced.f90
 	@make datacopy
-	@cp $(DATDIR)/Wind_pinatubo_climaticphase.nc ../../../Windparam.dat
-	@cp $(DATDIR)/Triang_pinatubo_1cube.dat ../../../Triang.dat
-
-Agulhas::
-	@make maincopy
-	@cp $(OPTDIR)/ADV_wind.agulhas.tstep.f90 ADV_wind.f90
-#	@cp $(OPTDIR)/ADV_rhs.agulhas.f90 ADV_rhs.f90
-#	@cp $(OPTDIR)/SLM_simple.clip SLM_simple.f90
-#	@cp $(OPTDIR)/SLM_advanced.dual SLM_advanced.f90
-	@cp $(OPTDIR)/test_box_rhs.agulhas.f90 ADV_rhs.f90
-	@make datacopy
-#	@cp $(DATDIR)/Triang_agulhas_test_cuboid.dat ../../../Triang.dat
-	@cp $(DATDIR)/Triang_pinatubo_1cube_mozam.dat ../../../Triang.dat
-#	@cp $(DATDIR)/Triang_agulhas_test_cuboid_tiny.dat ../../../Triang.dat
-
-Agulhas_Retroflection::
-	@make maincopy
-	@cp $(OPTDIR)/ADV_wind.agulhas.tstep.f90 ADV_wind.f90
-	@cp $(OPTDIR)/ADV_rhs.agulhas.f90 ADV_rhs.f90
-	@make datacopy
-	@cp $(DATDIR)/Triang_agulhas_full_domain.dat ../../../Triang.dat
+	@cp $(DATDIR)/Wind_pinatubo_climaticphase.nc Windparam.dat
+	@cp $(DATDIR)/Triang_pinatubo_1cube.dat Triang.dat
 
 Quadrature::
 	@cp $(OPTDIR)/ADV_semilagrange.adv ADV_semilagrange.f90
@@ -268,10 +246,6 @@ Kaeser::
 Circular::
 	@cp $(OPTDIR)/ADV_wind.circ ADV_wind.f90
 	@cp $(OPTDIR)/SLM_initial.circ SLM_initial.f90
-
-Berlin::
-	@cp $(OPTDIR)/ADV_wind.berlin ADV_wind.f90
-	@cp $(OPTDIR)/SLM_initial.berlin SLM_initial.f90
 
 #----------------------------------------------------------------#
 # THIS COMPILES THE MAIN PROGRAM                                 #

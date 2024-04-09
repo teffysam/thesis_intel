@@ -1,0 +1,51 @@
+**************************************************************************
+ FLASH90
+ FLexible Adaptive Semi-Lagrangian Hack
+ written in Fortran 90
+
+**************************************************************************
+
+ CONTENTS OF THIS DIRECTORY "$(FLASHDIR)/linux"
+
+Makefile	- Makefile
+Makefile.nogr	- Makefile (for non-OpenGL machine)
+Parameters.dat	- Input data 
+README		- this file
+
+--------------------------------------------------------------------------
+
+ WHAT TO DO HERE:
+
+In order to create and run an executable there are severel steps to be taken:
+
+FIRST: Build a grid generator library libamatos3d.a/.so/.dylib
+   see in amatos3d directory how to do this
+
+SECOND: create a taylored executable. The simplest way to do so is (for example):
+   make Small_Pinatubo 
+   make executable
+
+THIRD: To run the executable, type
+   FLASH -h
+This will print out a help screen describing the options of FLASH
+   FLASH -b -f Parameters.dat
+will run FLASH in batch mode, where the input parameters are read from
+Parameters.dat.
+
+ALTERNATIVES:
+
+You may choose different taylored Executables. In the THIRD Step you may type
+one of the following instead of "make maincopy":
+
+1. make Slot
+   this will create an executable calculating the Slotted Cylinder Test Case
+
+2. make Dual
+   this has to be called additionally to any of the others. It creates an
+   executable with the dual grid interpolation approach.
+
+...
+
+**************************************************************************
+ j. behrens, 8/98, 3/99, 01/18
+**************************************************************************
