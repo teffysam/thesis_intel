@@ -4,34 +4,18 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
-    
         {
-            "name": "(gdb) Launch",
+            "name": "Launch",
             "type": "cppdbg",
+            "miDebuggerPath": "/usr/local/bin/lldb-mi",
             "request": "launch",
-            "program": "${workspaceFolder}/flash3d/compile/linux_g64/FLASH3D",
-            "logging": {
-                "engineLogging": true
-                       },
-            "args": ["-b","-f","./Parameters.dat"],
+            "program": "${workspaceFolder}/flash3d/compile/macos_gfortran/FLASH3D",
+            "args": ["-b","-f","${workspaceFolder}/Parameters.dat"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            // "environment": [
-            //     {
-            //         "name": "LD_PRELOAD",2
-            //         "value": "/usr/lib/gcc/x86_64-pc-linux-gnu/4.8.5/libgfortran.so.3"
-            //     }
-            // ],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": false
-                }
-            ]
+            "environment": [],
+            "externalConsole": false
+
         }
     ]
 }
