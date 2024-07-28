@@ -3,6 +3,8 @@
 
 ## Description
 - TBA
+- Amatos 3d - [Read here](./amatos3d/README)
+- Flash 3d  - [Read here](./flash3d/README)
 
 
 ## How to run
