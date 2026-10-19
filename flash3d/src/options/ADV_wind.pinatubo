@@ -132,7 +132,7 @@
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not identify lon dimension')
       i_ncstat= nf_inq_dimlen(i_fileid, i_dimid, i_lon)
-	  write(*,*) i_lon
+!	  write(*,*) i_lon
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read lon dimension')
       
@@ -190,7 +190,7 @@
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not determine time varid')
       i_ncstat= nf_get_var_real(i_fileid, i_varid, r_time)
-	  write(*,*) r_time
+!	  write(*,*) r_time
 	  IF(i_ncstat /= NF_NOERR) &
 	    CALL grid_error(c_error='[read_netcdf_currents]: could not read time data')
 

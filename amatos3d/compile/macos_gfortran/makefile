@@ -37,7 +37,7 @@ BLASLIB =
 # !! This has to be alterd by user !!
 # LAPACKDIR =
 LAPACKDIR = -L/opt/homebrew/opt/lapack/lib
-LAPACKLIB =  -framework Accelerate
+LAPACKLIB = -lblas -llapack
 # SET IO_EMIT LIBRARY PATH
 EMITDIR = 
 EMITLIB =  -lstdc++ #-lresolv -lsocket -lnsl -lCstd
@@ -63,10 +63,10 @@ CLEAREX_EXT = *.i90
 #----------------------------------------------------------------#
 # FLAGS FOR Mac OS X/ Intel Fortran                              #
 #----------------------------------------------------------------#
-F90     = gfortran
-cc      = gcc-13
-CC      = g++-13
-LOADER  = gfortran
+F90     = flang
+cc      = clang
+CC      = clang++
+LOADER  = flang
 AR      = ar
 CP      = cp
 CPFLAGS =
@@ -75,10 +75,10 @@ ARFLAGS = vru
 MF = -D
 # --------------------- next are for debugging ------------------#
 ifeq ($(strip $(MODE)),debug)
-  FFLAGS = -fbounds-check -ggdb -fpic -funderscoring # -C
-  CFLAGS = -ggdb -fpic
-  LDFLAGS = -ggdb -mmacosx-version-min=14
-  SHFLAGS = -fpic -dynamiclib -mmacosx-version-min=14
+  FFLAGS = -g -v -fpic -funderscoring # -C
+  CFLAGS = -g -fpic
+  LDFLAGS = -g 
+  SHFLAGS = -fpic 
 endif
 # --------------------- next are for optimized debugging --------#
 ifeq ($(strip $(MODE)),optdebug)
@@ -146,7 +146,7 @@ include $(MAINDIR)/compile/Makefiles/Makefile.cpsrc
 # see also $(MAINDIR)/compile/Makefiles/Makefile.common
 $(GRDSLIB): $(GRIDLIB)
 	@echo "make: Creating dynamic shared object (dso) library" $(SHFLAGS)
-	$(LOADER) $(SHFLAGS) -o $(GRDSLIB) $(SEROBJ) $(LIB_SH)
+	$(LOADER) $(SHFLAGS) -shared -o $(GRDSLIB) $(SEROBJ) $(LIB_SH)
 #----------------------------------------------------------------#
 # THIS CREATES THE MAIN PROGRAM                                  #
 #----------------------------------------------------------------#

@@ -229,6 +229,7 @@
 
 !---------- calculate in an iteration process the displacements
 
+!$OMP PARALLEL DO PRIVATE(r_axy, r_xyc, i_cnt2)
 	  unknown_loop: DO i_cnt1=1,i_arlen
 	    r_axy= 0.0
 
@@ -239,6 +240,7 @@
 
 	    r_alpha(:,i_cnt1)= r_axy
 	  END DO unknown_loop
+!$OMP END PARALLEL DO
 
 	  RETURN
 	  END SUBROUTINE slm_displace
@@ -271,10 +273,11 @@
 	  ELSE
 	    r_tim= 0.0
 	  END IF
-
+!$OMP PARALLEL DO PRIVATE(i_cnt)
 	  main_loop: DO i_cnt=1, i_arlen
 	    r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
 	  END DO main_loop
+!$OMP END PARALLEL DO
 	  RETURN
 	  END SUBROUTINE slm_update
 
@@ -343,7 +346,7 @@
 	  END DO dim_loop
 
 !---------- loop over nodes: find element containing upstream point
-
+!$OMP PARALLEL DO PRIVATE(i_cnt, i_out, i_stat)
 	  node_loop: DO i_cnt=1, i_arlen
 
 !---------- check if upstream value is outside of the domain
@@ -370,6 +373,7 @@
 	    END IF small_val
 
 	  END DO node_loop
+!$OMP END PARALLEL DO
 
 !---------- deallocate work array
 

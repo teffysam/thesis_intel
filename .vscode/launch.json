@@ -6,16 +6,12 @@
     "configurations": [
         {
             "name": "Launch",
-            "type": "cppdbg",
-            "miDebuggerPath": "/usr/local/bin/lldb-mi",
+            "type": "lldb",
             "request": "launch",
+            "cwd": "${workspaceFolder}/flash3d",
             "program": "${workspaceFolder}/flash3d/compile/macos_gfortran/FLASH3D",
-            "args": ["-b","-f","${workspaceFolder}/Parameters.dat"],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false
-
+            "args": ["-b","-f","${workspaceFolder}/flash3d/Parameters.dat"]
+            // "preLaunchTask": "build all"
         }
     ]
 }

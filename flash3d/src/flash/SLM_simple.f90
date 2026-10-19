@@ -227,18 +227,21 @@
 	    r_tim= 0.0
 	  END IF
 
-!---------- calculate in an iteration process the displacements
 
+
+!---------- calculate in an iteration process the displacements
+      !$OMP PARALLEL DO PRIVATE(r_axy, r_xyc, i_cnt2)
 	  unknown_loop: DO i_cnt1=1,i_arlen
 	    r_axy= 0.0
 
 	    iter_loop: DO i_cnt2=1, p_param%phy%i_adviterations
 	      r_xyc= r_coord(:,i_cnt1)- r_fac* r_axy
-	      r_axy= r_dt0* slm_windfield(p_param,r_xyc, r_time=r_tim)
+	      r_axy= r_dt0* slm_windfield(r_xyc, r_time=r_tim)
 	    END DO iter_loop
 
 	    r_alpha(:,i_cnt1)= r_axy
 	  END DO unknown_loop
+      !$OMP END PARALLEL DO
 
 	  RETURN
 	  END SUBROUTINE slm_displace
@@ -265,20 +268,21 @@
 
 !---------- including a non-zero right hand side, we have
 
-	  r_dt= p_param%phy%r_deltatime
-	  IF(present(r_time)) THEN
-	    r_tim= r_time
-	  ELSE
-	    r_tim= 0.0
-	  END IF
+	!   r_dt= p_param%phy%r_deltatime
+	!   IF(present(r_time)) THEN
+	!     r_tim= r_time
+	!   ELSE
+	!     r_tim= 0.0
+	!   END IF
+       !$OMP PARALLEL DO PRIVATE(i_cnt)
+	   main_loop: DO i_cnt=1, i_arlen
+	!   r_righthandside = slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
+	!   r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* r_righthandside
+	!   r_integral = grid_integral(p_param, r_righthandside)
 
-	  main_loop: DO i_cnt=1, i_arlen
-	  r_righthandside = slm_righthand(p_param,r_coord(:,i_cnt),r_tim)
-	  r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* r_righthandside
-	  r_integral = grid_integral(p_param, r_righthandside)
-
-		! r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(p_param,r_coord(:,i_cnt),r_tim),r_coord(:,i_cnt),i_cnt,r_time)
-	  END DO main_loop
+	 	r_udate(i_cnt)= r_rside(i_cnt)+ r_dt* slm_ring(slm_windfield(p_param,r_coord(:,i_cnt),r_tim),r_coord(:,i_cnt),i_cnt,r_time)
+	   END DO main_loop
+       !$OMP END PARALLEL DO
 	  RETURN
 	  END SUBROUTINE slm_update
 

@@ -749,8 +749,8 @@
 
 	      i_size= p_ghand(i_timeplus)%i_nnumber
 	      allocate(r_tracer(i_size), r_coord(GRID_dimension,i_size), stat=i_alct)
-		  write(*,*) r_tracer, i_size
-	      write(*,*) i_alct
+		!   write(*,*) r_tracer, i_size
+	    !   write(*,*) i_alct
 	      IF(i_alct /= 0) CALL grid_error(38)
 
 !-SLM--------- do the following SLM calculations in arrays (grid-point-wise)

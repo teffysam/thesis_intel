@@ -1,0 +1,53 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "make tidy",
+            "type": "shell",
+            "command": "make tidy",
+            "options": {
+                "cwd": "/Users/teffy/thesis_intel/flash3d/compile/macos_gfortran"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "make Small_Pinatubo",
+            "type": "shell",
+            "command": "make Small_Pinatubo",
+            "options": {
+                "cwd": "/Users/teffy/thesis_intel/flash3d/compile/macos_gfortran"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "make executable",
+            "type": "shell",
+            "command": "make executable",
+            "options": {
+                "cwd": "/Users/teffy/thesis_intel/flash3d/compile/macos_gfortran"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "build all",
+            "dependsOn": [
+                "make tidy",
+                "make Small_Pinatubo",
+                "make executable"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}
