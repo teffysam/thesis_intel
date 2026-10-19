@@ -73,6 +73,6 @@
 	
 	  RETURN
 	  END FUNCTION slm_righthand
-
+! Here is finally a comment
 !*****************************************************************
 	END MODULE ADV_rhs
